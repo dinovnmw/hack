@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Hacker Interface</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes rippleEffect {
+            from { transform: scale(0); opacity: 1; }
+            to { transform: scale(4); opacity: 0; }
+        }
+
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        #modalContent {
+            text-align: center;
+            background-color: #222;
+            padding: 40px;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            box-shadow: 0 0 30px #00ff00;
+        }
+
+        #modal select, #modal input, #modal button {
+            margin: 10px 0;
+            padding: 12px;
+            font-size: 16px;
+            background-color: #333;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        #modal button {
+            background-color: #00ff00;
+            color: #222;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #modal button:hover { background-color: #fff; color: #00ff00; }
+
+        #mainContent {
+            display: none;
+            padding: 40px;
+            text-align: center;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 30px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+        }
+
+        input {
+            width: 60%;
+            padding: 15px;
+            background-color: #333;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            font-size: 18px;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        #output {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #222;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.7);
+        }
+
+        #output h3, #output p {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .ripple {
+            position: absolute;
+            background: rgba(0, 255, 0, 0.4);
+            border-radius: 50%;
+            transform: scale(0);
+            pointer-events: none;
+            animation: rippleEffect 1s ease-out;
+        }
+
+        #f12Message, #rightClickMessage {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 20px;
+            background-color: rgba(255, 0, 0, 0.7);
+            color: #fff;
+            font-size: 24px;
+            border-radius: 10px;
+            z-index: 20;
+            display: none;
+            animation: fadeIn 1s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="modal">
+        <div id="modalContent">
+            <h2 id="modalHeading">Choose Language and Enter Key</h2>
+            <select id="languageSelector">
+                <option value="en">English</option>
+                <option value="vi">Tiếng Việt</option>
+            </select>
+            <input type="password" id="accessKey" placeholder="Enter Key">
+            <button id="submitKey">Submit</button>
+            <div class="error" id="errorMessage" style="display: none;">Invalid Key. Please try again.</div>
+        </div>
+    </div>
+
+    <div id="mainContent">
+        <h1 id="mainHeading">Hacker-Like Information Finder</h1>
+        <input type="text" id="search" placeholder="Enter text to search...">
+        <div id="output"></div>
+    </div>
+
+    <div id="f12Message">Dino doesn't like that.</div>
+    <div id="rightClickMessage">Dino doesn't like that.</div>
+
+    <script>
+        const correctKey = "DinoX8";
+        const modal = document.getElementById("modal");
+        const mainContent = document.getElementById("mainContent");
+        const errorMessage = document.getElementById("errorMessage");
+        const languageSelector = document.getElementById("languageSelector");
+        const modalHeading = document.getElementById("modalHeading");
+        const accessKeyInput = document.getElementById("accessKey");
+        const submitKeyButton = document.getElementById("submitKey");
+        const mainHeading = document.getElementById("mainHeading");
+        const searchInput = document.getElementById("search");
+
+        const translations = {
+            en: {
+                modalHeading: "Choose Language and Enter Key",
+                placeholderKey: "Enter Key",
+                submitButton: "Submit",
+                errorMessage: "Invalid Key. Please try again.",
+                mainHeading: "Hacker-Like Information Finder",
+                placeholderSearch: "Enter text to search..."
+            },
+            vi: {
+                modalHeading: "Chọn Ngôn Ngữ và Nhập Mã",
+                placeholderKey: "Nhập Mã",
+                submitButton: "Xác Nhận",
+                errorMessage: "Sai mã. Vui lòng thử lại.",
+                mainHeading: "Tìm Kiếm Thông Tin Dạng Hacker",
+                placeholderSearch: "Nhập nội dung cần tìm..."
+            }
+        };
+
+        function updateLanguage(lang) {
+            modalHeading.textContent = translations[lang].modalHeading;
+            accessKeyInput.placeholder = translations[lang].placeholderKey;
+            submitKeyButton.textContent = translations[lang].submitButton;
+            errorMessage.textContent = translations[lang].errorMessage;
+            mainHeading.textContent = translations[lang].mainHeading;
+            searchInput.placeholder = translations[lang].placeholderSearch;
+        }
+
+        languageSelector.addEventListener("change", (e) => {
+            const selectedLanguage = e.target.value;
+            updateLanguage(selectedLanguage);
+        });
+
+        submitKeyButton.addEventListener("click", function () {
+            const enteredKey = accessKeyInput.value;
+            if (enteredKey === correctKey) {
+                modal.style.display = "none";
+                mainContent.style.display = "block";
+                document.body.style.overflow = "auto";
+            } else {
+                errorMessage.style.display = "block";
+            }
+        });
+
+        document.getElementById('search').addEventListener('input', function () {
+            const query = this.value;
+            if (query.length > 0) {
+                fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srsearch=${query}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const results = data.query.search;
+                        let output = '';
+                        results.forEach(result => {
+                            output += `<h3>${result.title}</h3><p>${result.snippet}</p>`;
+                        });
+                        document.getElementById('output').innerHTML = output;
+                    });
+            } else {
+                document.getElementById('output').innerHTML = '';
+            }
+        });
+
+        // Add ripple effect on click
+        document.body.addEventListener('click', function (e) {
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple';
+            ripple.style.left = `${e.clientX}px`;
+            ripple.style.top = `${e.clientY}px`;
+            document.body.appendChild(ripple);
+            ripple.addEventListener('animationend', () => ripple.remove());
+        });
+
+        // Prevent F12 (DevTools) and show message
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'F12') {
+                e.preventDefault();
+                const f12Message = document.getElementById('f12Message');
+                f12Message.style.display = 'block'; // Show message
+                setTimeout(() => {
+                    f12Message.style.display = 'none'; // Hide message after 3 seconds
+                }, 3000);
+            }
+        });
+
+        // Prevent Right-Click and show message
+        window.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            const rightClickMessage = document.getElementById('rightClickMessage');
+            rightClickMessage.style.display = 'block'; // Show message
+            setTimeout(() => {
+                rightClickMessage.style.display = 'none'; // Hide message after 3 seconds
+            }, 3000);
+        });
+
+        updateLanguage("en");
+    </script>
+</body>
+</html>
