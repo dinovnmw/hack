@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dino music Player</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300&display=swap');
+
+  @keyframes bgGradientShift {
+    0%, 100% {
+      background: linear-gradient(135deg, #2e3440, #3b4252);
+    }
+    50% {
+      background: linear-gradient(135deg, #434c5e, #4c566a);
+    }
+  }
+  body {
+    margin:0; padding:0;
+    height:100vh;
+    font-family: 'Montserrat', sans-serif;
+    background: linear-gradient(135deg, #2e3440, #3b4252);
+    animation: bgGradientShift 90s ease-in-out infinite;
+    color: #d8dee9cc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  .app-container {
+    width: 480px;
+    background: rgba(30, 35, 45, 0.75);
+    border-radius: 24px;
+    box-shadow:
+      0 0 40px #7289daaa,
+      inset 0 0 50px #4c566a88;
+    padding: 28px 28px 36px;
+    backdrop-filter: blur(12px);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  h2 {
+    font-weight: 300;
+    font-size: 2rem;
+    text-align: center;
+    margin: 0 0 14px;
+    color: #81a1c1;
+    text-shadow: 0 0 8px #81a1c1cc;
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 8px;
+    user-select: none;
+  }
+  .tab-button {
+    font-weight: 500;
+    font-size: 1.1rem;
+    padding: 8px 24px;
+    border-radius: 18px;
+    border: 1.5px solid transparent;
+    color: #81a1c1cc;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px transparent;
+  }
+  .tab-button:hover {
+    color: #a3b1c6dd;
+  }
+  .tab-button.active {
+    color: #c4d9ff;
+    border-color: #81a1c1bb;
+    background: rgba(130, 165, 230, 0.18);
+    box-shadow: 0 0 30px #81a1c1bb;
+  }
+
+  /* Tabs container */
+  .tabs-content {
+    position: relative;
+    min-height: 380px;
+  }
+  .tab-panel {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+  }
+  .tab-panel.active {
+    opacity: 1;
+    pointer-events: auto;
+    position: relative;
+  }
+
+  /* Upload section shared styles */
+  .upload-section {
+    border: 2px dashed #81a1c166;
+    border-radius: 18px;
+    padding: 20px 18px;
+    text-align: center;
+    font-size: 1.1rem;
+    color: #81a1c1aa;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.3s ease;
+    background: rgba(60, 68, 90, 0.15);
+    box-shadow: inset 0 0 14px #7289da44;
+    position: relative;
+  }
+  .upload-section:hover {
+    border-color: #88aaffcc;
+    color: #88aaffee;
+  }
+  .upload-section input[type=file] {
+    position: absolute;
+    width: 100%; height: 100%;
+    opacity: 0;
+    top: 0; left: 0;
+    cursor: pointer;
+  }
+  .file-info {
+    margin-top: 14px;
+    font-size: 0.95rem;
+    color: #a3b1c6dd;
+    user-select: text;
+    min-height: 20px;
+  }
+
+  /* Music controls */
+  .controls {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+  button {
+    background: transparent;
+    border: 1.8px solid #81a1c1aa;
+    border-radius: 16px;
+    color: #a3b1c6cc;
+    padding: 10px 22px;
+    font-size: 1.05rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 0 12px #81a1c1bb;
+    transition: all 0.3s ease;
+    user-select: none;
+  }
+  button:hover:not(:disabled) {
+    background: #81a1c155;
+    border-color: #92b0ffcc;
+    color: #cce0ff;
+    box-shadow: 0 0 32px #81a1c1ee;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Waveform canvas */
+  .waveform {
+    margin-top: 20px;
+    height: 100px;
+    width: 100%;
+    position: relative;
+    border-radius: 14px;
+    background: rgba(40, 44, 58, 0.45);
+    box-shadow: inset 0 0 18px #6f86ff88;
+    filter: drop-shadow(0 0 14px #90aaffcc);
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 14px;
+  }
+
+  /* Image preview on top of waveform */
+  .image-preview-frame {
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 160px;
+    height: 160px;
+    background: rgba(40, 44, 58, 0.38);
+    border: 2px solid rgba(130, 155, 230, 0.28);
+    border-radius: 18px;
+    box-shadow: inset 0 0 18px #7699e0aa;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+  }
+  .image-preview-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .image-preview-frame span {
+    color: #7f8ea8;
+    font-size: 1rem;
+    user-select:none;
+  }
+
+  /* Upload tab scroll */
+  .upload-tab-content {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 8px 16px 24px;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  /* Rain animation */
+  .rain {
+    pointer-events: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .drop {
+    position: absolute;
+    bottom: 100%;
+    width: 2px;
+    height: 22px;
+    background: rgba(130, 155, 230, 0.12);
+    border-radius: 1px;
+    animation-name: fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    filter: drop-shadow(0 0 6px #7699e0aa);
+  }
+  @keyframes fall {
+    to {
+      transform: translateY(110vh);
+      opacity: 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-container" id="app">
+  <h2>Chill Music Player</h2>
+
+  <div class="tab-bar">
+    <button class="tab-button active" data-tab="play">Nghe Nhạc</button>
+    <button class="tab-button" data-tab="upload">Upload</button>
+  </div>
+
+  <div class="tabs-content">
+    <section class="tab-panel active" id="tab-play">
+      <div style="position:relative;">
+        <div class="image-preview-frame" id="imagePreviewFrame">
+          <span>Chưa có ảnh</span>
+        </div>
+        <canvas class="waveform" id="waveCanvas"></canvas>
+      </div>
+
+      <div class="controls">
+        <button id="btnPlayPause" disabled>▶ Play</button>
+        <button id="btnLoop" disabled>Loop: Off</button>
+        <button id="btnEnhance" disabled>Cảm Âm: Off</button>
+      </div>
+
+      <div class="file-info" id="musicInfo">Vui lòng upload nhạc</div>
+    </section>
+
+    <section class="tab-panel" id="tab-upload">
+      <div class="upload-tab-content">
+        <label class="upload-section">
+          Upload Nhạc (MP3, WAV,...)
+          <input type="file" id="musicFile" accept="audio/*" />
+        </label>
+        <label class="upload-section">
+          Upload Ảnh (Tự crop vuông 1x1)
+          <input type="file" id="imageFile" accept="image/*" />
+        </label>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="rain" class="rain"></div>
+
+<script>
+  // Tab switching
+  const tabs = document.querySelectorAll('.tab-button');
+  const panels = document.querySelectorAll('.tab-panel');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.tab;
+      document.getElementById('tab-' + target).classList.add('active');
+    });
+  });
+
+  // Audio setup
+  const waveCanvas = document.getElementById('waveCanvas');
+  const ctx = waveCanvas.getContext('2d');
+  waveCanvas.width = waveCanvas.clientWidth * window.devicePixelRatio;
+  waveCanvas.height = waveCanvas.clientHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  let audioCtx;
+  let audioBuffer;
+  let audioSource;
+  let analyser;
+  let dataArray;
+  let bufferLength;
+
+  let audioPlaying = false;
+  let loopOn = false;
+  let enhanceOn = false;
+
+  const btnPlayPause = document.getElementById('btnPlayPause');
+  const btnLoop = document.getElementById('btnLoop');
+  const btnEnhance = document.getElementById('btnEnhance');
+  const musicInfo = document.getElementById('musicInfo');
+
+  function setupAudioContext(buffer) {
+    if(audioSource) {
+      try { audioSource.disconnect(); } catch {}
+    }
+    if(audioCtx) {
+      try { audioCtx.close(); } catch {}
+    }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    audioSource = audioCtx.createBufferSource();
+    audioSource.buffer = buffer;
+    audioSource.loop = loopOn;
+
+    const gainNode = audioCtx.createGain();
+
+    const analyserNode = audioCtx.createAnalyser();
+    analyser = analyserNode;
+    analyser.fftSize = 256;
+    bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
+
+    let sourceNode = audioSource;
+
+    if(enhanceOn) {
+      // Cảm âm - filter highshelf để tạp âm bớt rè
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'highshelf';
+      filter.frequency.value = 2000;
+      filter.gain.value = 8;
+      sourceNode.connect(filter);
+      filter.connect(gainNode);
+    } else {
+      sourceNode.connect(gainNode);
+    }
+
+    gainNode.connect(analyserNode);
+    analyserNode.connect(audioCtx.destination);
+  }
+
+  function drawWaveform() {
+    if(!analyser) return;
+    requestAnimationFrame(drawWaveform);
+
+    analyser.getByteTimeDomainData(dataArray);
+    ctx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+
+    const w = waveCanvas.clientWidth;
+    const h = waveCanvas.clientHeight;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#88aaffcc';
+    ctx.shadowColor = '#90aaffcc';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+
+    const sliceWidth = w / bufferLength;
+    let x = 0;
+    for(let i=0; i<bufferLength; i++) {
+      const v = dataArray[i] / 128.0;
+      const y = v * h/2;
+      if(i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+      x += sliceWidth;
+    }
+    ctx.lineTo(w, h/2);
+    ctx.stroke();
+  }
+  drawWaveform();
+
+  // Upload nhạc
+  const musicFileInput = document.getElementById('musicFile');
+  musicFileInput.addEventListener('change', async (e) => {
+    if(!e.target.files.length) return;
+    const file = e.target.files[0];
+    if(!file.type.startsWith('audio')) {
+      musicInfo.textContent = 'Vui lòng chọn file âm thanh hợp lệ';
+      return;
+    }
+    musicInfo.textContent = `Đang tải: ${file.name}`;
+    btnPlayPause.disabled = true;
+    btnLoop.disabled = true;
+    btnEnhance.disabled = true;
+
+    const arrayBuffer = await file.arrayBuffer();
+    if(audioCtx) audioCtx.close();
+
+    audioBuffer = await (new (window.AudioContext || window.webkitAudioContext)()).decodeAudioData(arrayBuffer);
+    setupAudioContext(audioBuffer);
+
+    musicInfo.textContent = `Đã chọn: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
+    btnPlayPause.disabled = false;
+    btnLoop.disabled = false;
+    btnEnhance.disabled = false;
+
+    btnPlayPause.textContent = '▶ Play';
+    audioPlaying = false;
+  });
+
+  // Play / Pause
+  btnPlayPause.addEventListener('click', () => {
+    if(audioPlaying) {
+      audioSource.stop();
+      audioPlaying = false;
+      btnPlayPause.textContent = '▶ Play';
+    } else {
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+      setupAudioContext(audioBuffer);
+      audioSource.start(0);
+      audioPlaying = true;
+      btnPlayPause.textContent = '❚❚ Pause';
+    }
+  });
+
+  // Loop
+  btnLoop.addEventListener('click', () => {
+    loopOn = !loopOn;
+    if(audioSource) audioSource.loop = loopOn;
+    btnLoop.textContent = `Loop: ${loopOn ? 'On' : 'Off'}`;
+  });
+
+  // Cảm âm
+  btnEnhance.addEventListener('click', () => {
+    enhanceOn = !enhanceOn;
+    btnEnhance.textContent = `Cảm Âm: ${enhanceOn ? 'On' : 'Off'}`;
+    if(audioPlaying) {
+      audioSource.stop();
+      setupAudioContext(audioBuffer);
+      audioSource.start(0);
+    }
+  });
+
+  // Mưa chill
+  const rainContainer = document.getElementById('rain');
+  function createDrop() {
+    const drop = document.createElement('div');
+    drop.classList.add('drop');
+    drop.style.left = Math.random() * window.innerWidth + 'px';
+    drop.style.animationDuration = (Math.random() * 1 + 1.8) + 's';
+    rainContainer.appendChild(drop);
+    setTimeout(() => drop.remove(), 2000);
+  }
+  setInterval(createDrop, 120);
+
+  // Upload ảnh xử lý resize 1x1 trong canvas
+  const imageFileInput = document.getElementById('imageFile');
+  const imagePreviewFrame = document.getElementById('imagePreviewFrame');
+
+  imageFileInput.addEventListener('change', (e) => {
+    if(!e.target.files.length) return;
+    const file = e.target.files[0];
+    if(!file.type.startsWith('image')) {
+      imagePreviewFrame.innerHTML = '<span style="color:#b66868;">Vui lòng chọn file hình ảnh hợp lệ</span>';
+      return;
+    }
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = function(evt) {
+      img.onload = function() {
+        // Resize crop 1x1 vuông bằng canvas
+        const size = Math.min(img.width, img.height);
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;  
+        canvas.height = 160;
+        const ctx = canvas.getContext('2d');
+
+        // Crop giữa ảnh
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 160, 160);
+
+        // Hiển thị ảnh trong khung
+        imagePreviewFrame.innerHTML = '';
+        const previewImg = document.createElement('img');
+        previewImg.src = canvas.toDataURL('image/png');
+        previewImg.alt = 'Ảnh đã resize 1x1';
+        imagePreviewFrame.appendChild(previewImg);
+      }
+      img.src = evt.target.result;
+    }
+    reader.readAsDataURL(file);
+  });
+</script>
+
+</body>
+</html>
