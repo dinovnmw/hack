@@ -1,0 +1,564 @@
+--[[ 
+    PVP ULTIMATE HUB - V1.0
+    Tính năng: PVP Bot thông minh, Sinh tồn, FPS Boost, Anti-Kick, Aimbot, ESP
+    Tác giả: Gemini
+    UI: Orion Library
+]]
+
+-- // 1. KHỞI TẠO ORION LIB & DỊCH VỤ // --
+
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local Window = OrionLib:MakeWindow({Name = "Gemini PVP Ultimate Hub", HidePremium = false, SaveConfig = true, ConfigFolder = "GeminiPVP"})
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- // 2. CẤU HÌNH & TRẠNG THÁI CHUNG // --
+
+local Config = {
+    -- PVP Bot
+    AutoAttack = false,
+    RetreatHealth = 30,  -- % máu để bỏ chạy
+    EngageHealth = 80,   -- % máu để quay lại
+    RetreatHeight = 400, -- Độ cao khi bỏ chạy
+    ClickSpeed = 0.1,    -- Tốc độ click
+    TweenSpeed = 250,    -- Tốc độ bay (PVP/Teleport)
+    
+    -- Movement / Utility
+    Noclip = false,
+    WalkWater = false,
+    SafeWaterHeight = -1.5,
+    
+    -- Visuals
+    ESP_Enabled = false,
+    
+    -- Aimbot (Standalone)
+    AimbotEnabled = false,
+    AimbotSmoothness = 0.1,
+    AimbotFOV = 150,
+}
+
+local State = {
+    IsRetreating = false,
+    WaterConnection = nil,
+    CurrentTarget = nil,
+}
+
+-- // 3. HÀM HỖ TRỢ CHUNG // --
+
+-- 3.1. Anti-Ban / Anti-Kick cơ bản
+local function ActivateAntiBan()
+    pcall(function()
+        -- Anti-AFK
+        local vu = game:GetService("VirtualUser")
+        LocalPlayer.Idled:connect(function()
+            vu:Button2Down(Vector2.new(0,0),Workspace.CurrentCamera.CFrame)
+            wait(1)
+            vu:Button2Up(Vector2.new(0,0),Workspace.CurrentCamera.CFrame)
+        end)
+    end)
+    OrionLib:MakeNotification({Name = "Hệ thống", Content = "Đã bật Anti-AFK cơ bản!", Image = "rbxassetid://4483345998", Time = 3})
+end
+
+-- 3.2. Siêu Giảm Lag (FPS Boost)
+local function BoostFPS()
+    pcall(function()
+        Workspace.Terrain.WaterWaveSize = 0
+        Workspace.Terrain.WaterWaveSpeed = 0
+        Workspace.Terrain.WaterReflectance = 0
+        Workspace.Terrain.WaterTransparency = 0
+        game:GetService("Lighting").GlobalShadows = false
+        game:GetService("Lighting").FogEnd = 9e9
+        sethiddenproperty(game:GetService("Lighting"), "Technology", Enum.Technology.Compatibility)
+    end)
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") then
+            v:Destroy()
+        end
+    end
+    OrionLib:MakeNotification({Name = "Thành công", Content = "Đã tối ưu hóa đồ họa!", Image = "rbxassetid://4483345998", Time = 3})
+end
+
+-- 3.3. Tìm địch gần nhất
+local function GetNearestEnemy(maxDistance)
+    local ClosestDist = maxDistance or math.huge
+    local ClosestPlr = nil
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character.Humanoid.Health > 0 then
+            local IsEnemy = true
+            if LocalPlayer.Team and v.Team and LocalPlayer.Team == v.Team then
+                IsEnemy = false -- Bỏ qua đồng đội
+            end
+            
+            if IsEnemy then
+                local Dist = (LocalPlayer.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if Dist < ClosestDist then
+                    ClosestDist = Dist
+                    ClosestPlr = v
+                end
+            end
+        end
+    end
+    return ClosestPlr
+end
+
+-- 3.4. Hàm Tween (Bay)
+local function TweenTo(CFramePos)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local Root = LocalPlayer.Character.HumanoidRootPart
+    local Dist = (Root.Position - CFramePos.Position).Magnitude
+    local Time = Dist / Config.TweenSpeed
+    
+    local TInfo = TweenInfo.new(Time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    local Tween = TweenService:Create(Root, TInfo, {CFrame = CFramePos})
+    Tween:Play()
+    
+    -- Bật Noclip tạm thời khi bay
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end
+
+-- 3.5. Auto Click
+local function AutoClick()
+    local VP = Camera.ViewportSize
+    VirtualInputManager:SendMouseButtonEvent(VP.X / 2, VP.Y / 2, 0, true, game, 1)
+    task.wait(Config.ClickSpeed / 2)
+    VirtualInputManager:SendMouseButtonEvent(VP.X / 2, VP.Y / 2, 0, false, game, 1)
+end
+
+-- // 4. MOVEMENT & VISUALS (WALKWATER, NOCLIP, ESP) // --
+
+-- 4.1. Noclip Logic
+RunService.Stepped:Connect(function()
+    if Config.Noclip and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == true then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- 4.2. WalkWater Logic (Phương án Raycast ổn định)
+local function UpdateWalkWater()
+    if Config.WalkWater and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local HRP = LocalPlayer.Character.HumanoidRootPart
+        local raycastResult = Workspace:Raycast(HRP.Position, Vector3.new(0, -5, 0), RaycastParams.new())
+        
+        local IsOverWater = false
+        if raycastResult and raycastResult.Instance then
+            local mat = raycastResult.Instance:IsA("Terrain") and Workspace.Terrain:GetMaterial(raycastResult.Position) or raycastResult.Instance.Material
+            if mat == Enum.Material.Water then IsOverWater = true end
+        end
+
+        if IsOverWater then
+            HRP.Velocity = Vector3.new(HRP.Velocity.X, 0, HRP.Velocity.Z) -- Ngăn chìm
+            
+            local TargetY = HRP.Position.Y
+            if raycastResult then
+                TargetY = raycastResult.Position.Y + Config.SafeWaterHeight 
+            end
+            
+            -- Tween nhẹ vị trí Y để đi mượt
+            local CurrentY = HRP.Position.Y
+            HRP.Position = Vector3.new(HRP.Position.X, CurrentY + (TargetY - CurrentY) * 0.1, HRP.Position.Z)
+        end
+    end
+end
+
+local function ToggleWalkWater(Enabled)
+    if Enabled then
+        State.WaterConnection = RunService.Stepped:Connect(UpdateWalkWater)
+    else
+        if State.WaterConnection then
+            State.WaterConnection:Disconnect()
+            State.WaterConnection = nil
+        end
+    end
+end
+
+-- 4.3. ESP Logic (Sử dụng Highlight)
+RunService.RenderStepped:Connect(function()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") then
+            local hl = v.Character:FindFirstChild("HighlightESP")
+            
+            if Config.ESP_Enabled then
+                if not hl then
+                    hl = Instance.new("Highlight")
+                    hl.Name = "HighlightESP"
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
+                    hl.Parent = v.Character
+                end
+            elseif hl then
+                hl:Destroy()
+            end
+        end
+    end
+end)
+
+-- // 5. AIMBOT STANDALONE (Dùng khi Auto Attack TẮT) // --
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+
+RunService.RenderStepped:Connect(function()
+    if Config.AimbotEnabled and not Config.AutoAttack and LocalPlayer.Character then
+        local target = GetNearestEnemy(Config.AimbotFOV)
+        
+        -- Draw FOV
+        FOVCircle.Visible = true
+        FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+        FOVCircle.Radius = Config.AimbotFOV
+        FOVCircle.Color = target and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 255, 255)
+        FOVCircle.Thickness = 1
+        
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local TargetPos = target.Character.Head.Position
+            
+            -- Tween CFrame Camera
+            TweenService:Create(Camera, TweenInfo.new(Config.AimbotSmoothness, Enum.EasingStyle.Sine), {CFrame = CFrame.new(Camera.CFrame.Position, TargetPos)}):Play()
+        end
+    else
+        FOVCircle.Visible = false
+    end
+end)
+
+
+-- // 6. LOGIC PVP BOT THÔNG MINH (CORE LOOP) // --
+task.spawn(function()
+    while true do
+        task.wait()
+        if Config.AutoAttack and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            local MyHealthPct = (LocalPlayer.Character.Humanoid.Health / LocalPlayer.Character.Humanoid.MaxHealth) * 100
+            local HRP = LocalPlayer.Character.HumanoidRootPart
+
+            -- 6.1. Logic Sinh tồn (Retreat/Engage)
+            if MyHealthPct <= Config.RetreatHealth then
+                State.IsRetreating = true
+            elseif MyHealthPct >= Config.EngageHealth then
+                State.IsRetreating = false
+            end
+            
+            if State.IsRetreating then
+                -- Bay lên trời (Safe Zone)
+                local SkyPos = HRP.Position
+                SkyPos = Vector3.new(SkyPos.X, Config.RetreatHeight, SkyPos.Z)
+                TweenTo(CFrame.new(SkyPos))
+            else
+                -- 6.2. Logic Tấn công (Attack)
+                local Target = GetNearestEnemy()
+                if Target and Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
+                    
+                    -- Bay tới gần địch (Cách 3 unit để dễ đánh)
+                    local TargetCFrame = Target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3) 
+                    TweenTo(TargetCFrame)
+                    
+                    -- Nếu đã ở gần (< 15) thì click
+                    if (HRP.Position - Target.Character.HumanoidRootPart.Position).Magnitude < 15 then
+                        AutoClick()
+                        -- Tự trang bị vũ khí (Melee/Sword/Gun)
+                        for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                LocalPlayer.Character.Humanoid:EquipTool(tool)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        else
+            -- Reset va chạm khi tắt script hoặc PVP Bot bị ngắt
+            if LocalPlayer.Character then
+                for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = true end
+                end
+            end
+        end
+    end
+end)
+
+-- // 7. CÀI ĐẶT GIAO DIỆN ORION // --
+
+-- Tab: 🔥 PVP Bot (Thông minh)
+local PVPBotTab = Window:MakeTab({Name = "🔥 PVP Bot (Auto)", Icon = "rbxassetid://4483345998"})
+
+PVPBotTab:AddToggle({
+    Name = "Bật Auto PVP Bot (Thoát/Công)",
+    Default = false,
+    Callback = function(Value)
+        Config.AutoAttack = Value
+        if Value then
+            Config.AimbotEnabled = false -- Tắt Aimbot khi dùng Auto Bot
+            FOVCircle.Visible = false
+        end
+    end    
+})
+
+PVPBotTab:AddLabel("Cơ Chế Sinh Tồn")
+
+PVPBotTab:AddSlider({
+    Name = "Rút Lui khi Máu <= (%)",
+    Min = 10, Max = 50, Default = 30, Increment = 5, ValueName = "%",
+    Callback = function(Value) Config.RetreatHealth = Value end    
+})
+
+PVPBotTab:AddSlider({
+    Name = "Quay Lại khi Máu >= (%)",
+    Min = 50, Max = 100, Default = 80, Increment = 5, ValueName = "%",
+    Callback = function(Value) Config.EngageHealth = Value end    
+})
+
+-- Tab: ✨ Aimbot/ESP
+local CombatTab = Window:MakeTab({Name = "✨ Aimbot/ESP", Icon = "rbxassetid://4483345998"})
+
+CombatTab:AddToggle({
+    Name = "Bật Aimbot (Điều khiển chuột)",
+    Default = false,
+    Callback = function(Value)
+        Config.AimbotEnabled = Value
+        if Value then Config.AutoAttack = false end -- Tắt Auto Bot khi dùng Aimbot
+    end    
+})
+
+CombatTab:AddSlider({
+    Name = "Bán Kính FOV",
+    Min = 50, Max = 500, Default = 150, Increment = 1, ValueName = "px",
+    Callback = function(Value) Config.AimbotFOV = Value end    
+})
+
+CombatTab:AddSlider({
+    Name = "Độ Mượt Aimbot (Legit)",
+    Min = 0.05, Max = 1, Default = 0.1, Increment = 0.05, ValueName = "giây",
+    Callback = function(Value) Config.AimbotSmoothness = Value end    
+})
+
+CombatTab:AddToggle({
+    Name = "ESP Người Chơi (Wallhack)",
+    Default = false,
+    Callback = function(Value) Config.ESP_Enabled = Value end    
+})
+
+-- Tab: 🏃 Movement
+local MovementTab = Window:MakeTab({Name = "🏃 Movement", Icon = "rbxassetid://4483345998"})
+
+MovementTab:AddToggle({
+    Name = "Noclip (Đi xuyên tường)",
+    Default = false,
+    Callback = function(Value) Config.Noclip = Value end    
+})
+
+MovementTab:AddToggle({
+    Name = "Đi Trên Nước (WalkWater)",
+    Default = false,
+    Callback = ToggleWalkWater    
+})
+
+MovementTab:AddSlider({
+    Name = "Tốc Độ (WalkSpeed)",
+    Min = 16, Max = 100, Default = 16, Increment = 1,
+    Callback = function(Value) 
+        if LocalPlayer.Character then LocalPlayer.Character.Humanoid.WalkSpeed = Value end
+    end    
+})
+
+-- Tab: ⚙️ Cài Đặt & Hiệu Suất
+local SettingTab = Window:MakeTab({Name = "⚙️ Cài Đặt/Hiệu Suất", Icon = "rbxassetid://4483345998"})
+
+SettingTab:AddButton({
+    Name = "Siêu Giảm Lag (FPS Boost)",
+    Callback = BoostFPS    
+})
+
+SettingTab:AddButton({
+    Name = "Kích hoạt Anti-AFK/Kick cơ bản",
+    Callback = ActivateAntiBan    
+})
+
+SettingTab:AddSlider({
+    Name = "Tốc độ Bay (Tween Speed)",
+    Min = 100, Max = 500, Default = 250, Increment = 10,
+    Callback = function(Value) Config.TweenSpeed = Value end    
+})
+
+-- Anti-Ban/Kick for Blox Fruits (Optimized)
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local Stats = game:GetService("Stats")
+local Player = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local TeleportService = game:GetService("TeleportService")
+
+-- Anti-AFK: Prevent Idle Kick
+Player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new(0, 0))
+end)
+
+-- Bypass Auto Disconnect and Prevent Kick
+local function preventKick()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+
+    local original = mt.__namecall
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+
+        -- Intercept Kick method to block it
+        if tostring(method) == "Kick" then
+            return nil
+        end
+
+        -- Block any force disconnect commands
+        if tostring(method) == "ForceDisconnect" then
+            return nil
+        end
+        
+        return original(self, unpack(args))
+    end)
+end
+preventKick()
+
+-- Auto Reconnect: Automatic Reconnection After Disconnection
+local function autoReconnect()
+    local isReconnecting = false
+    game.CoreGui.ChildAdded:Connect(function(child)
+        if child.Name == "ErrorPrompt" and not isReconnecting then
+            isReconnecting = true
+            wait(2) -- Wait before reconnecting
+            TeleportService:Teleport(game.PlaceId)
+        end
+    end)
+end
+autoReconnect()
+
+-- Anti-Report: Prevent Abuse Reporting
+local function antiReport()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+
+    local originalChat = mt.__namecall
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+
+        -- Block Report Abuse message sending via FireServer
+        if tostring(self) == "SayMessageRequest" and tostring(method) == "FireServer" then
+            return nil
+        end
+        
+        return originalChat(self, unpack(args))
+    end)
+end
+antiReport()
+
+-- Combat Anti-Detection (For Blox Fruits)
+local function antiCombatDetection()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+
+    local originalNamecall = mt.__namecall
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+
+        -- Prevent detection for combat actions like using fruit abilities
+        if tostring(method) == "FireServer" and tostring(self) == "ActivateAbility" then
+            return nil
+        end
+
+        return originalNamecall(self, unpack(args))
+    end)
+end
+antiCombatDetection()
+
+-- Teleportation Anti-Detection (For Blox Fruits)
+local function antiTeleportDetection()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+
+    local originalIndex = mt.__index
+    mt.__index = newcclosure(function(self, key)
+        if key == "TeleportTo" then
+            return function() end -- Block teleport detection
+        end
+        return originalIndex(self, key)
+    end)
+end
+antiTeleportDetection()
+
+-- Ping Stabilizer: Reduces Lag by Adjusting the Environment
+local function stabilizePing()
+    local lastOptimization = tick()
+    RunService.Stepped:Connect(function()
+        setfpscap(60) -- Lock FPS at 60 to prevent lag
+        if Stats.Network.ServerStatsItem["Data Ping"]:GetValue() > 300 and (tick() - lastOptimization > 5) then
+            lastOptimization = tick() -- Perform optimization every 5 seconds
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic -- Optimize material for better performance
+                end
+            end
+        end
+    end)
+end
+stabilizePing()
+
+-- Hide Exploits: Prevent Detection of Exploits
+local function hideExploits()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+
+    local originalIndex = mt.__index
+    mt.__index = newcclosure(function(self, key)
+        if key == "Kick" then
+            return function() end -- Block the Kick function to prevent bans
+        end
+        return originalIndex(self, key)
+    end)
+end
+hideExploits()
+
+-- Advanced Anti-Detection: Block Reporting and Detection
+local function advancedAntiDetection()
+    local oldNameCall = nil
+    oldNameCall = hookmetamethod(game, "__namecall", function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        
+        -- Block FireServer for ReportAbuse method
+        if method == "FireServer" and tostring(self) == "ReportAbuse" then
+            return nil -- Block abuse report
+        end
+        
+        -- Block any suspicious method calls (such as Kick)
+        if method == "Kick" then
+            return nil
+        end
+
+        return oldNameCall(self, ...)
+    end)
+end
+advancedAntiDetection()
+
+print("[Anti-Ban for Blox Fruits]: Script initialized successfully!")
+
+OrionLib:Init()
