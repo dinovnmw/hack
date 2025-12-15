@@ -1,10 +1,10 @@
 --[[
-    DinoPVP V2 - Optimized & Fixed
-    UI Library: Fluent
-    Features: Auto PVP, Aimbot, ESP, Hitbox, Speed, Noclip, Fix Lag
+    DinoPVP V2 - Ultimate Upgrade
+    Author: AI Generated
+    Library: Fluent (Dawid-Scripts)
+    Status: Optimized, Fixed, & Feature Rich
 ]]
 
--- ================= LOAD LIBRARY =================
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
@@ -16,308 +16,258 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
-local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
 
 -- ================= VARIABLES =================
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-local Options = Fluent.Options
+-- Global State
+local State = {
+    CurrentTarget = nil,
+    IsRetreating = false,
+    ActiveTween = nil
+}
+
+-- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
     Title = "DinoPVP V2",
-    SubTitle = "Ultimate PVP & Farm",
+    SubTitle = "Quang Minh",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
-    Theme = "Dark",
+    Theme = "Amethyst",
     MinimizeKey = Enum.KeyCode.RightControl
 })
 
+local Tabs = {
+    PVP = Window:AddTab({ Title = "Auto PVP", Icon = "swords" }),
+    Combat = Window:AddTab({ Title = "Combat", Icon = "crosshair" }),
+    Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
+    Movement = Window:AddTab({ Title = "Movement", Icon = "move" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
 -- ================= CONFIGURATION =================
+-- These values are controlled by the UI
 local Config = {
-    -- PVP
-    AutoAttack = false,
-    RetreatHealth = 30,
-    EngageHealth = 80,
-    RetreatHeight = 100,
-    TweenSpeed = 250, -- Studs per second
+    AutoPVP = false,
+    RetreatHP = 30,
+    EngageHP = 80,
+    TweenSpeed = 200,
+    DistanceCheck = 1000,
     
-    -- Combat
-    FastAttack = false,
     Aimbot = false,
     AimbotFOV = 150,
     AimbotSmooth = 0.5,
+    AimbotPart = "Head",
+    
     Hitbox = false,
     HitboxSize = 5,
-    ESP = false,
     
-    -- Movement
+    ESP = false,
+    ESPTeamCheck = true,
+    
     WalkSpeed = 16,
     JumpPower = 50,
     Noclip = false,
-    WalkWater = false,
-    WaterHeight = -1
+    InfJump = false,
+    WalkWater = false
 }
 
-local State = {
-    IsRetreating = false,
-    Target = nil
-}
+-- ================= HELPER FUNCTIONS =================
 
--- ================= TABS =================
-local Tabs = {
-    PVP = Window:AddTab({ Title = "PVP Bot", Icon = "swords" }),
-    Combat = Window:AddTab({ Title = "Combat", Icon = "crosshair" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "save" })
-}
+-- Check if a player is a valid enemy
+local function IsValidEnemy(plr)
+    if not plr or plr == LocalPlayer or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChild("Humanoid")
+    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not hum or not root or hum.Health <= 0 then return false end
+    
+    -- Team Check
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+        return false
+    end
+    
+    -- ForceField Check (Optional)
+    if plr.Character:FindFirstChild("ForceField") then return false end
+    
+    return true
+end
 
--- ================= UTILITIES =================
-
--- Find nearest enemy ignoring team mates
-local function GetNearestEnemy(maxDistance)
-    local closestPlayer = nil
-    local shortestDistance = maxDistance or math.huge
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            -- Check if alive and not on same team
-            if humanoid and humanoid.Health > 0 then
-                if not player.Team or player.Team ~= LocalPlayer.Team then
-                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < shortestDistance then
-                        closestPlayer = player
-                        shortestDistance = dist
+-- Get Nearest Enemy Logic
+local function GetNearestTarget(maxDist, useMouse)
+    local closestPlr = nil
+    local shortestDist = maxDist or math.huge
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if IsValidEnemy(v) then
+            local dist
+            if useMouse then
+                -- Distance from Mouse Cursor (for Aimbot)
+                local vector, onScreen = Camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
+                if onScreen then
+                    local mouseDist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(vector.X, vector.Y)).Magnitude
+                    if mouseDist < shortestDist then
+                        closestPlr = v
+                        shortestDist = mouseDist
                     end
+                end
+            else
+                -- Distance from Character (for Auto PVP)
+                dist = (LocalPlayer.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if dist < shortestDist then
+                    closestPlr = v
+                    shortestDist = dist
                 end
             end
         end
     end
-    return closestPlayer
+    return closestPlr
 end
 
--- Smooth movement using TweenService
-local function TweenTo(cframe)
+-- Safe Tween Function
+local function TweenCharacter(cframe)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     
     local hrp = char.HumanoidRootPart
-    local distance = (hrp.Position - cframe.Position).Magnitude
-    local speed = Config.TweenSpeed
-    local time = distance / speed
+    local dist = (hrp.Position - cframe.Position).Magnitude
     
-    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = cframe})
-    tween:Play()
-end
-
--- Simulate Mouse Click
-local function Click()
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-    task.wait(0.05)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-end
-
--- Fix Lag Function
-local function FixLag()
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 9e9
-    Lighting.Brightness = 0
-    settings().Rendering.QualityLevel = "Level01"
+    -- Calculate time based on speed
+    local time = dist / Config.TweenSpeed
     
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("CornerWedgePart") or v:IsA("TrussPart") then
-            v.Material = "Plastic"
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            v.Transparency = 1
-        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            v.Lifetime = NumberRange.new(0)
-        elseif v:IsA("Explosion") then
-            v.BlastPressure = 1
-            v.BlastRadius = 1
+    -- Cancel old tween if exists
+    if State.ActiveTween then State.ActiveTween:Cancel() end
+    
+    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
+    State.ActiveTween = TweenService:Create(hrp, ti, {CFrame = cframe})
+    State.ActiveTween:Play()
+    
+    -- Noclip while tweening to prevent getting stuck
+    if dist > 5 then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
         end
     end
-    
-    Fluent:Notify({
-        Title = "Fix Lag",
-        Content = "Graphics reduced for better FPS.",
-        Duration = 3
-    })
+end
+
+-- Click Simulation
+local function AttackClick()
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+    task.wait(0.01)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 end
 
 -- ================= UI ELEMENTS =================
 
 -- [[ PVP TAB ]]
-local PVPSection = Tabs.PVP:AddSection("Auto PVP Logic")
+local PVPSection = Tabs.PVP:AddSection("Bot Logic")
 
-PVPSection:AddToggle("AutoPVP", {
-    Title = "Enable Auto PVP Bot",
-    Default = false,
-    Callback = function(Value)
-        Config.AutoAttack = Value
-    end
-})
+PVPSection:AddToggle("AutoPVP", {Title = "Enable Auto PVP", Default = false, Callback = function(v) 
+    Config.AutoPVP = v 
+    if not v and State.ActiveTween then State.ActiveTween:Cancel() end
+end})
 
-PVPSection:AddSlider("RetreatHP", {
-    Title = "Retreat Health %",
-    Min = 10, Max = 90, Default = 30, Rounding = 0,
-    Callback = function(Value) Config.RetreatHealth = Value end
-})
-
-PVPSection:AddSlider("EngageHP", {
-    Title = "Re-Engage Health %",
-    Min = 20, Max = 100, Default = 80, Rounding = 0,
-    Callback = function(Value) Config.EngageHealth = Value end
-})
-
-PVPSection:AddSlider("TweenSpd", {
-    Title = "Movement Speed (Tween)",
-    Min = 50, Max = 500, Default = 250, Rounding = 0,
-    Callback = function(Value) Config.TweenSpeed = Value end
-})
+PVPSection:AddSlider("TweenSpeed", {Title = "Bot Speed (Tween)", Min = 50, Max = 400, Default = 200, Rounding = 0, Callback = function(v) Config.TweenSpeed = v end})
+PVPSection:AddSlider("RetreatHP", {Title = "Retreat HP %", Min = 0, Max = 90, Default = 30, Rounding = 0, Callback = function(v) Config.RetreatHP = v end})
+PVPSection:AddSlider("EngageHP", {Title = "Re-Engage HP %", Min = 10, Max = 100, Default = 80, Rounding = 0, Callback = function(v) Config.EngageHP = v end})
 
 -- [[ COMBAT TAB ]]
 local CombatSection = Tabs.Combat:AddSection("Assists")
 
-CombatSection:AddToggle("FastAttack", {
-    Title = "Fast Attack (Auto Click)",
-    Default = false,
-    Callback = function(Value) Config.FastAttack = Value end
-})
+CombatSection:AddToggle("Aimbot", {Title = "Camera Aimbot", Default = false, Callback = function(v) Config.Aimbot = v end})
+CombatSection:AddDropdown("AimPart", {Title = "Aim Part", Values = {"Head", "HumanoidRootPart", "Torso"}, Default = "Head", Multi = false, Callback = function(v) Config.AimbotPart = v end})
+CombatSection:AddSlider("FOV", {Title = "Aimbot FOV", Min = 20, Max = 800, Default = 150, Rounding = 0, Callback = function(v) Config.AimbotFOV = v end})
 
-CombatSection:AddToggle("Aimbot", {
-    Title = "Camera Aimbot",
-    Default = false,
-    Callback = function(Value) Config.Aimbot = Value end
-})
+CombatSection:AddToggle("Hitbox", {Title = "Hitbox Expander", Default = false, Callback = function(v) Config.Hitbox = v end})
+CombatSection:AddSlider("HitboxSize", {Title = "Hitbox Size", Min = 2, Max = 25, Default = 5, Rounding = 0, Callback = function(v) Config.HitboxSize = v end})
 
-CombatSection:AddSlider("AimbotFOV", {
-    Title = "Aimbot FOV",
-    Min = 50, Max = 800, Default = 150, Rounding = 0,
-    Callback = function(Value) Config.AimbotFOV = Value end
-})
+-- [[ VISUALS TAB ]]
+local VisualsSection = Tabs.Visuals:AddSection("ESP")
+VisualsSection:AddToggle("ESP", {Title = "Enable ESP", Default = false, Callback = function(v) Config.ESP = v end})
+VisualsSection:AddToggle("ESPTeam", {Title = "Team Check", Default = true, Callback = function(v) Config.ESPTeamCheck = v end})
 
-CombatSection:AddToggle("ESP", {
-    Title = "Player ESP (Chams)",
-    Default = false,
-    Callback = function(Value) Config.ESP = Value end
-})
+-- [[ MOVEMENT TAB ]]
+local MoveSection = Tabs.Movement:AddSection("Local Player")
+MoveSection:AddSlider("WS", {Title = "WalkSpeed", Min = 16, Max = 250, Default = 16, Rounding = 0, Callback = function(v) Config.WalkSpeed = v end})
+MoveSection:AddSlider("JP", {Title = "JumpPower", Min = 50, Max = 300, Default = 50, Rounding = 0, Callback = function(v) Config.JumpPower = v end})
+MoveSection:AddToggle("Noclip", {Title = "Noclip", Default = false, Callback = function(v) Config.Noclip = v end})
+MoveSection:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callback = function(v) Config.InfJump = v end})
+MoveSection:AddToggle("WaterWalk", {Title = "Walk On Water", Default = false, Callback = function(v) Config.WalkWater = v end})
 
-CombatSection:AddToggle("Hitbox", {
-    Title = "Hitbox Expander",
-    Default = false,
-    Callback = function(Value) Config.Hitbox = Value end
-})
-
-CombatSection:AddSlider("HitboxSiz", {
-    Title = "Hitbox Size",
-    Min = 2, Max = 20, Default = 5, Rounding = 0,
-    Callback = function(Value) Config.HitboxSize = Value end
-})
-
--- [[ PLAYER TAB ]]
-local PlayerSection = Tabs.Player:AddSection("Local Player")
-
-PlayerSection:AddSlider("WalkSpeed", {
-    Title = "Walk Speed",
-    Min = 16, Max = 200, Default = 16, Rounding = 0,
-    Callback = function(Value) 
-        Config.WalkSpeed = Value 
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = Value
-        end
-    end
-})
-
-PlayerSection:AddSlider("JumpPower", {
-    Title = "Jump Power",
-    Min = 50, Max = 300, Default = 50, Rounding = 0,
-    Callback = function(Value) 
-        Config.JumpPower = Value 
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.JumpPower = Value
-        end
-    end
-})
-
-PlayerSection:AddToggle("Noclip", {
-    Title = "Noclip (Walk Through Walls)",
-    Default = false,
-    Callback = function(Value) Config.Noclip = Value end
-})
-
-PlayerSection:AddToggle("WalkWater", {
-    Title = "Walk On Water",
-    Default = false,
-    Callback = function(Value) Config.WalkWater = Value end
-})
-
--- [[ MISC TAB ]]
-Tabs.Misc:AddButton({
+-- [[ SETTINGS TAB ]]
+Tabs.Settings:AddButton({
     Title = "FPS Boost / Fix Lag",
-    Description = "Removes textures and shadows",
-    Callback = FixLag
+    Description = "Removes textures to improve performance",
+    Callback = function()
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Part") or v:IsA("MeshPart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end
+        Lighting.GlobalShadows = false
+        Fluent:Notify({Title = "Success", Content = "FPS Boost Applied", Duration = 3})
+    end
 })
 
--- ================= LOGIC LOOPS =================
+-- ================= MAIN LOOPS =================
 
--- 1. PVP BOT LOOP
+-- 1. AUTO PVP LOOP
 task.spawn(function()
     while task.wait(0.1) do
-        if not Config.AutoAttack then continue end
+        if not Config.AutoPVP then continue end
         
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then continue end
         
         local hum = char.Humanoid
         local hrp = char.HumanoidRootPart
-        local healthPct = (hum.Health / hum.MaxHealth) * 100
-
-        -- Health Check Logic
-        if healthPct <= Config.RetreatHealth then
+        local hpPercent = (hum.Health / hum.MaxHealth) * 100
+        
+        -- Logic: Retreat or Engage
+        if hpPercent <= Config.RetreatHP then
             State.IsRetreating = true
-        elseif healthPct >= Config.EngageHealth then
+        elseif hpPercent >= Config.EngageHP then
             State.IsRetreating = false
         end
-
+        
         if State.IsRetreating then
-            -- Fly Up
-            TweenTo(CFrame.new(hrp.Position.X, hrp.Position.Y + 50, hrp.Position.Z))
+            -- Fly Up high to heal
+            TweenCharacter(CFrame.new(hrp.Position.X, hrp.Position.Y + 150, hrp.Position.Z))
         else
-            -- Attack Logic
-            local target = GetNearestEnemy(1000)
+            -- Find Target
+            local target = GetNearestTarget(Config.DistanceCheck, false)
             if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                local targetPos = target.Character.HumanoidRootPart.CFrame
+                local tHrp = target.Character.HumanoidRootPart
                 
-                -- Move slightly behind/near target
-                TweenTo(targetPos * CFrame.new(0, 0, 3))
+                -- Move to Target (Behind them slightly)
+                local attackPos = tHrp.CFrame * CFrame.new(0, 0, 3)
+                TweenCharacter(attackPos)
                 
                 -- Look at target
-                hrp.CFrame = CFrame.lookAt(hrp.Position, target.Character.HumanoidRootPart.Position)
+                hrp.CFrame = CFrame.lookAt(hrp.Position, tHrp.Position)
                 
-                -- Click if close
-                if (hrp.Position - target.Character.HumanoidRootPart.Position).Magnitude < 15 then
-                    Click()
+                -- Attack if close
+                if (hrp.Position - tHrp.Position).Magnitude < 10 then
+                    AttackClick()
                 end
+            else
+                -- No target, stop moving
+                if State.ActiveTween then State.ActiveTween:Cancel() end
             end
         end
     end
 end)
 
--- 2. FAST ATTACK LOOP
-task.spawn(function()
-    while task.wait() do
-        if Config.FastAttack then
-            Click()
-        end
-    end
-end)
-
--- 3. RENDER STEPPED (Aimbot, ESP, Hitbox)
+-- 2. AIMBOT & VISUALS LOOP (RenderStepped)
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 1
 FOVCircle.Color = Color3.fromRGB(255, 255, 255)
@@ -327,94 +277,95 @@ RunService.RenderStepped:Connect(function()
     -- Update FOV Circle
     FOVCircle.Visible = Config.Aimbot
     FOVCircle.Radius = Config.AimbotFOV
-    FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36) -- Offset for topbar
-
+    FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+    
     -- Aimbot Logic
     if Config.Aimbot then
-        local target = GetNearestEnemy(Config.AimbotFOV) -- Logic needs screen check ideally, but distance works for basic
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local targetPos = target.Character.Head.Position
-            local currentCF = Camera.CFrame
-            local targetCF = CFrame.new(currentCF.Position, targetPos)
-            
-            Camera.CFrame = currentCF:Lerp(targetCF, Config.AimbotSmooth)
+        local target = GetNearestTarget(Config.AimbotFOV, true)
+        if target and target.Character and target.Character:FindFirstChild(Config.AimbotPart) then
+            local tPos = target.Character[Config.AimbotPart].Position
+            local curCFrame = Camera.CFrame
+            local newCFrame = CFrame.new(curCFrame.Position, tPos)
+            Camera.CFrame = curCFrame:Lerp(newCFrame, Config.AimbotSmooth)
         end
     end
-
-    -- Hitbox & ESP Loop
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = plr.Character.HumanoidRootPart
-            local hum = plr.Character:FindFirstChild("Humanoid")
+    
+    -- ESP Manager
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character then
+            local hasHighlight = v.Character:FindFirstChild("DinoESP")
             
-            -- Hitbox Logic
-            if Config.Hitbox and plr.Team ~= LocalPlayer.Team then
-                hrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
-                hrp.Transparency = 0.7
-                hrp.CanCollide = false
-            else
-                -- Reset size if disabled (Approximation)
-                hrp.Size = Vector3.new(2, 2, 1)
-                hrp.Transparency = 1
-            end
-
-            -- ESP Logic
-            local highlight = plr.Character:FindFirstChild("DinoESP")
-            if Config.ESP and plr.Team ~= LocalPlayer.Team and hum and hum.Health > 0 then
-                if not highlight then
-                    highlight = Instance.new("Highlight")
-                    highlight.Name = "DinoESP"
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                    highlight.Parent = plr.Character
+            if Config.ESP and IsValidEnemy(v) then
+                if not hasHighlight then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "DinoESP"
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
+                    hl.Parent = v.Character
                 end
             else
-                if highlight then highlight:Destroy() end
+                if hasHighlight then hasHighlight:Destroy() end
             end
         end
     end
 end)
 
--- 4. PHYSICS STEPPED (Noclip, WalkSpeed, Water)
+-- 3. PHYSICS LOOP (Stepped)
 RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     
-    -- Noclip
-    if Config.Noclip then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
-                part.CanCollide = false
-            end
-        end
-    end
-
-    -- WalkSpeed & JumpPower Enforcement
+    -- WalkSpeed & JumpPower
     local hum = char:FindFirstChild("Humanoid")
     if hum then
         if hum.WalkSpeed ~= Config.WalkSpeed then hum.WalkSpeed = Config.WalkSpeed end
         if hum.JumpPower ~= Config.JumpPower then hum.JumpPower = Config.JumpPower end
     end
-
-    -- Walk On Water
+    
+    -- Noclip
+    if Config.Noclip then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+        end
+    end
+    
+    -- Hitbox Expander
+    if Config.Hitbox then
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer and IsValidEnemy(v) then
+                local hrp = v.Character.HumanoidRootPart
+                hrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                hrp.Transparency = 0.6
+                hrp.CanCollide = false
+            end
+        end
+    end
+    
+    -- Walk on Water
     if Config.WalkWater then
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if hrp then
-            local rayOrigin = hrp.Position
-            local rayDirection = Vector3.new(0, -10, 0)
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {char}
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {char}
+            params.FilterType = Enum.RaycastFilterType.Exclude
             
-            local ray = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+            local ray = Workspace:Raycast(hrp.Position, Vector3.new(0, -5, 0), params)
             if ray and ray.Material == Enum.Material.Water then
-                -- Keep player above water
-                local currentVel = hrp.Velocity
-                hrp.Velocity = Vector3.new(currentVel.X, 0, currentVel.Z)
-                hrp.Position = Vector3.new(hrp.Position.X, ray.Position.Y + 3.5, hrp.Position.Z)
+                hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
+                -- Keep player slightly above water
+                if hrp.Position.Y < ray.Position.Y + 2 then
+                     hrp.CFrame = CFrame.new(hrp.Position.X, ray.Position.Y + 3, hrp.Position.Z)
+                end
             end
         end
+    end
+end)
+
+-- Infinite Jump
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if Config.InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState("Jumping")
     end
 end)
 
@@ -422,12 +373,13 @@ end)
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetFolder("DinoPVP")
+SaveManager:SetFolder("DinoPVP_V2")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+
 Window:SelectTab(1)
 
 Fluent:Notify({
     Title = "DinoPVP V2 Loaded",
-    Content = "Script optimized and ready!",
+    Content = "Script upgraded and optimized successfully!",
     Duration = 5
 })
