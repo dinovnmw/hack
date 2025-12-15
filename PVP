@@ -168,7 +168,7 @@ end
 -- [[ PVP TAB ]]
 local PVPSection = Tabs.PVP:AddSection("Bot Logic")
 
-PVPSection:AddButton("AutoPVP", {Title = "Enable Auto PVP", Default = true, Callback = function(v) 
+PVPSection:AddToggle("AutoPVP", {Title = "Enable Auto PVP", Default = true, Callback = function(v) 
     loadstring(game:HttpGet('https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/Bountyhunt'))()
 end})
 
