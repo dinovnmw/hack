@@ -168,14 +168,9 @@ end
 -- [[ PVP TAB ]]
 local PVPSection = Tabs.PVP:AddSection("Bot Logic")
 
-PVPSection:AddToggle("AutoPVP", {Title = "Enable Auto PVP", Default = false, Callback = function(v) 
-    Config.AutoPVP = v 
-    if not v and State.ActiveTween then State.ActiveTween:Cancel() end
+PVPSection:AddButton("AutoPVP", {Title = "Enable Auto PVP", Default = true, Callback = function(v) 
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/Bountyhunt'))()
 end})
-
-PVPSection:AddSlider("TweenSpeed", {Title = "Bot Speed (Tween)", Min = 50, Max = 400, Default = 200, Rounding = 0, Callback = function(v) Config.TweenSpeed = v end})
-PVPSection:AddSlider("RetreatHP", {Title = "Retreat HP %", Min = 0, Max = 90, Default = 30, Rounding = 0, Callback = function(v) Config.RetreatHP = v end})
-PVPSection:AddSlider("EngageHP", {Title = "Re-Engage HP %", Min = 10, Max = 100, Default = 80, Rounding = 0, Callback = function(v) Config.EngageHP = v end})
 
 -- [[ COMBAT TAB ]]
 local CombatSection = Tabs.Combat:AddSection("Assists")
