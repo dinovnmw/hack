@@ -24,9 +24,10 @@ LP.CharacterAdded:Connect(LoadChar)
 local State = {
     Enabled = false,
     AutoClick = false,
+    SpamZX = false,
     ClickDelay = 0.05,
     HeightOffset = 3,
-    TweenSpeed = 350,
+    TweenSpeed = 200,
     Saved = {},
     LastAttack = 0,
     Target = nil,
@@ -34,7 +35,7 @@ local State = {
     StartBounty = 0
 }
 
---================ AUT CLICK =================
+--================ AUTO CLICK =================
 task.spawn(function()
     while task.wait() do
         if State.Enabled and State.AutoClick then
@@ -44,6 +45,19 @@ task.spawn(function()
             task.wait(State.ClickDelay)
         else
             task.wait(0.15)
+        end
+    end
+end)
+
+--================ SPAM Z X =================
+task.spawn(function()
+    while task.wait(0.08) do
+        if State.Enabled and State.SpamZX then
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Z, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Z, false, game)
+
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
         end
     end
 end)
@@ -98,7 +112,7 @@ local function TweenTo(pos)
     CurrentTween:Play()
 end
 
---================ FAST ATTACK + ANTIBAN =================
+--================ FAST ATTACK =================
 RunService.Heartbeat:Connect(function()
     if not State.Enabled then return end
     if tick() - State.LastAttack < math.random(6,10)/100 then return end
@@ -144,7 +158,7 @@ local Gui = Instance.new("ScreenGui", game.CoreGui)
 Gui.ResetOnSpawn = false
 
 local Main = Instance.new("Frame", Gui)
-Main.Size = UDim2.fromOffset(320,360)
+Main.Size = UDim2.fromOffset(320,400)
 Main.Position = UDim2.fromScale(0.5,0.25)
 Main.AnchorPoint = Vector2.new(0.5,0)
 Main.BackgroundColor3 = Color3.fromRGB(25,25,25)
@@ -154,7 +168,7 @@ Instance.new("UICorner", Main)
 
 local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1,0,0,45)
-Title.Text = "Dino Auto Bounty"
+Title.Text = "DinoHunter QM"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 20
 Title.TextColor3 = Color3.new(1,1,1)
@@ -175,48 +189,18 @@ end
 
 local Start = Button("BẬT AUTO",60)
 local Stop = Button("TẮT AUTO",110)
-local Next = Button("NEXT PLAYER",160)
+local ToggleZX = Button("SPAM Z X: OFF",160)
+local Next = Button("NEXT PLAYER",210)
 
 --================ INFO =================
 local Info = Instance.new("TextLabel", Main)
-Info.Size = UDim2.new(1,-40,0,80)
-Info.Position = UDim2.new(0,20,0,210)
+Info.Size = UDim2.new(1,-40,0,90)
+Info.Position = UDim2.new(0,20,0,260)
 Info.TextWrapped = true
 Info.Font = Enum.Font.Gotham
 Info.TextSize = 14
 Info.TextColor3 = Color3.new(1,1,1)
 Info.BackgroundTransparency = 1
-
---================ HIDE UI =================
-local HideBtn = Instance.new("TextButton", Main)
-HideBtn.Size = UDim2.new(0,30,0,30)
-HideBtn.Position = UDim2.new(1,-35,0,10)
-HideBtn.Text = "–"
-HideBtn.Font = Enum.Font.GothamBold
-HideBtn.TextSize = 22
-HideBtn.TextColor3 = Color3.new(1,1,1)
-HideBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-Instance.new("UICorner", HideBtn)
-
-local Icon = Instance.new("TextButton", Gui)
-Icon.Size = UDim2.fromOffset(50,50)
-Icon.Position = UDim2.fromScale(0.02,0.6)
-Icon.Text = "🦖"
-Icon.Font = Enum.Font.GothamBold
-Icon.TextSize = 24
-Icon.Visible = false
-Icon.BackgroundColor3 = Color3.fromRGB(25,25,25)
-Instance.new("UICorner", Icon)
-
-HideBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    Icon.Visible = true
-end)
-
-Icon.MouseButton1Click:Connect(function()
-    Main.Visible = true
-    Icon.Visible = false
-end)
 
 --================ BUTTON =================
 Start.MouseButton1Click:Connect(function()
@@ -234,9 +218,16 @@ end)
 Stop.MouseButton1Click:Connect(function()
     State.Enabled = false
     State.AutoClick = false
+    State.SpamZX = false
+    ToggleZX.Text = "SPAM Z X: OFF"
     Humanoid.WalkSpeed = State.Saved.WalkSpeed or 16
     Humanoid.JumpPower = State.Saved.JumpPower or 50
     workspace.Gravity = State.Saved.Gravity or 196.2
+end)
+
+ToggleZX.MouseButton1Click:Connect(function()
+    State.SpamZX = not State.SpamZX
+    ToggleZX.Text = "SPAM Z X: "..(State.SpamZX and "ON" or "OFF")
 end)
 
 Next.MouseButton1Click:Connect(function()
@@ -256,8 +247,9 @@ RunService.RenderStepped:Connect(function()
 
     Info.Text =
         "Target: "..targetName..
-        "\nBounty hiện tại: "..curBounty..
-        "\nThay đổi: "..(diff >= 0 and "+"..diff or diff)
+        "\nBounty: "..curBounty..
+        "\nThay đổi: "..(diff >= 0 and "+"..diff or diff)..
+        "\nSpam Z X: "..(State.SpamZX and "ON" or "OFF")
 end)
 
-print("Dino Auto Bounty Full Loaded")
+print("Dino Auto Bounty Loaded")
