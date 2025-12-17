@@ -1,3 +1,18 @@
+--[[
+    DINO HUNTER QM - FIXED & OPTIMIZED (v2.6)
+    Fixes:
+    - Fixed buttons not being clickable (Switched to Activated event).
+    - Fixed dragging logic causing input conflicts.
+    - Added proper script cleanup (prevents lag when re-executing).
+    - Added pcall safety for VirtualInputManager.
+]]
+
+--================ PREVENT MULTIPLE EXECUTIONS ================
+if getgenv().DinoHunterLoaded then
+    if getgenv().DinoHunterCleanup then getgenv().DinoHunterCleanup() end
+end
+getgenv().DinoHunterLoaded = true
+
 --================ SERVICES ================
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -5,251 +20,445 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
 local LP = Players.LocalPlayer
+local Mouse = LP:GetMouse()
 local Camera = workspace.CurrentCamera
 
---================ CHARACTER =================
-local Char, Humanoid, HRP, Backpack
-local function LoadChar()
-    Char = LP.Character or LP.CharacterAdded:Wait()
-    Humanoid = Char:WaitForChild("Humanoid")
-    HRP = Char:WaitForChild("HumanoidRootPart")
-    Backpack = LP:WaitForChild("Backpack")
-end
-LoadChar()
-LP.CharacterAdded:Connect(LoadChar)
-
---================ STATE =================
-local State = {
+--================ SETTINGS & STATE ================
+local Settings = {
     Enabled = false,
-    AutoClick = false,
-    SpamZX = false,
-    ClickDelay = 0.05,
-    HeightOffset = 3,
-    TweenSpeed = 200,
-    Saved = {},
-    LastAttack = 0,
-    Target = nil,
-    SkipTarget = false,
-    StartBounty = 0
+    SilentHunt = false,
+    SpamSkills = false,
+    SkillList = {"Z", "X"},
+    SkillMode = "Click", -- "Click" or "Hold"
+    HoldTime = 1.0,
+    
+    ClickDelay = 0.1,
+    TweenSpeed = 250,
+    WalkSpeed = 120,
+    DistanceToAttack = 60,
+    HeightOffset = 5,
 }
 
---================ AUTO CLICK =================
-task.spawn(function()
-    while task.wait() do
-        if State.Enabled and State.AutoClick then
-            local vp = Camera.ViewportSize
-            VirtualInputManager:SendMouseButtonEvent(vp.X/2, vp.Y/2, 0, true, game, 1)
-            VirtualInputManager:SendMouseButtonEvent(vp.X/2, vp.Y/2, 0, false, game, 1)
-            task.wait(State.ClickDelay)
-        else
-            task.wait(0.15)
-        end
+local State = {
+    Target = nil,
+    IgnoreList = {},
+    GuiVisible = true
+}
+
+local Connections = {} -- Store connections to clean them up later
+
+--================ UI LIBRARY (FIXED) ================
+local function CreateGUI()
+    -- Cleanup old GUI
+    for _, v in pairs(CoreGui:GetChildren()) do
+        if v.Name == "DinoHunterUI" then v:Destroy() end
     end
-end)
 
---================ SPAM Z X =================
-task.spawn(function()
-    while task.wait(0.08) do
-        if State.Enabled and State.SpamZX then
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Z, false, game)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Z, false, game)
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "DinoHunterUI"
+    -- Use gethui() if available for better security, else CoreGui, else PlayerGui
+    local parent = (gethui and gethui()) or CoreGui or LP:WaitForChild("PlayerGui")
+    ScreenGui.Parent = parent
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.ResetOnSpawn = false
 
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
+    --// DRAG FUNCTION (FIXED)
+    local function MakeDraggable(frame, handle)
+        handle = handle or frame
+        local dragging, dragInput, dragStart, startPos
+        
+        local function update(input)
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
-    end
-end)
 
---================ UTILS =================
-local function EquipWeapon()
-    if Char:FindFirstChildWhichIsA("Tool") then return end
-    for _,v in ipairs(Backpack:GetChildren()) do
-        if v:IsA("Tool") then
-            v.Parent = Char
-            break
-        end
-    end
-end
-
-local function GetBounty(plr)
-    local ls = plr:FindFirstChild("leaderstats")
-    if not ls then return 0 end
-    local bounty = ls:FindFirstChild("Bounty") or ls:FindFirstChild("Honor")
-    return bounty and bounty.Value or 0
-end
-
-local function NearestPlayer()
-    local target
-    local dist = math.huge
-    for _,plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local h = plr.Character:FindFirstChild("Humanoid")
-            if h and h.Health > 0 then
-                local d = (plr.Character.HumanoidRootPart.Position - HRP.Position).Magnitude
-                if d < dist then
-                    dist = d
-                    target = plr
-                end
+        table.insert(Connections, handle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = frame.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
             end
-        end
+        end))
+
+        table.insert(Connections, handle.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end))
+
+        table.insert(Connections, UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                update(input)
+            end
+        end))
     end
-    return target
-end
 
---================ TWEEN =================
-local CurrentTween
-local function TweenTo(pos)
-    if CurrentTween then CurrentTween:Cancel() end
-    local dis = (HRP.Position - pos).Magnitude
-    local time = math.clamp(dis / State.TweenSpeed, 0.12, 1)
-    CurrentTween = TweenService:Create(
-        HRP,
-        TweenInfo.new(time, Enum.EasingStyle.Linear),
-        {CFrame = CFrame.new(pos)}
-    )
-    CurrentTween:Play()
-end
+    --// TOGGLE BUTTON
+    local ToggleBtn = Instance.new("ImageButton")
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Parent = ScreenGui
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ToggleBtn.Position = UDim2.new(0.1, 0, 0.1, 0)
+    ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+    ToggleBtn.Image = "rbxassetid://3926305904"
+    ToggleBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleBtn.Active = true
+    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+    
+    MakeDraggable(ToggleBtn)
 
---================ FAST ATTACK =================
-RunService.Heartbeat:Connect(function()
-    if not State.Enabled then return end
-    if tick() - State.LastAttack < math.random(6,10)/100 then return end
-    State.LastAttack = tick()
-    EquipWeapon()
-    pcall(function()
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", 0)
+    --// MAIN FRAME
+    local Main = Instance.new("Frame")
+    Main.Name = "MainFrame"
+    Main.Parent = ScreenGui
+    Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Main.Position = UDim2.new(0.5, -150, 0.5, -225)
+    Main.Size = UDim2.new(0, 300, 0, 450)
+    Main.BorderSizePixel = 0
+    Main.Active = true -- Important for input handling
+    Main.ClipsDescendants = true
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+
+    MakeDraggable(Main) -- Make the main frame draggable too
+
+    local Title = Instance.new("TextLabel")
+    Title.Parent = Main
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 0, 0, 0)
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "DINO HUNTER BY QM"
+    Title.TextColor3 = Color3.fromRGB(255, 65, 65)
+    Title.TextSize = 20
+
+    -- Toggle Logic
+    ToggleBtn.Activated:Connect(function()
+        State.GuiVisible = not State.GuiVisible
+        Main.Visible = State.GuiVisible
     end)
-end)
 
---================ MOVE =================
-task.spawn(function()
-    while task.wait(0.2) do
-        if State.Enabled and HRP then
-            if not State.Target or State.SkipTarget then
-                State.Target = NearestPlayer()
-                State.SkipTarget = false
-                if State.Target then
-                    State.StartBounty = GetBounty(LP)
-                end
-            end
+    --// ELEMENTS GENERATOR
+    local yOffset = 50
+    local function CreateBtn(text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Parent = Main
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        btn.Position = UDim2.new(0.05, 0, 0, yOffset)
+        btn.Size = UDim2.new(0.9, 0, 0, 35)
+        btn.Font = Enum.Font.GothamSemibold
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 14
+        btn.AutoButtonColor = true
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        
+        -- Use Activated instead of MouseButton1Click for better compatibility
+        btn.Activated:Connect(function()
+            callback(btn)
+        end)
+        yOffset = yOffset + 40
+        return btn
+    end
 
-            if State.Target and State.Target.Character then
-                local pos = State.Target.Character.HumanoidRootPart.Position + Vector3.new(0, State.HeightOffset, 0)
-                TweenTo(pos)
+    local function CreateInput(placeholder, callback)
+        local box = Instance.new("TextBox")
+        box.Parent = Main
+        box.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        box.Position = UDim2.new(0.05, 0, 0, yOffset)
+        box.Size = UDim2.new(0.9, 0, 0, 35)
+        box.Font = Enum.Font.Gotham
+        box.PlaceholderText = placeholder
+        box.Text = ""
+        box.TextColor3 = Color3.fromRGB(255, 255, 255)
+        box.TextSize = 14
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+        
+        box.FocusLost:Connect(function()
+            callback(box.Text)
+        end)
+        yOffset = yOffset + 40
+        return box
+    end
+
+    local StatusLbl = Instance.new("TextLabel")
+    StatusLbl.Parent = Main
+    StatusLbl.BackgroundTransparency = 1
+    StatusLbl.Position = UDim2.new(0.05, 0, 0.9, 0)
+    StatusLbl.Size = UDim2.new(0.9, 0, 0, 40)
+    StatusLbl.Font = Enum.Font.Gotham
+    StatusLbl.Text = "Status: Idle"
+    StatusLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    StatusLbl.TextSize = 12
+    StatusLbl.TextWrapped = true
+    StatusLbl.TextYAlignment = Enum.TextYAlignment.Top
+
+    --// BUTTONS CONFIG
+    CreateBtn("AUTO HUNT: OFF", function(self)
+        Settings.Enabled = not Settings.Enabled
+        self.Text = "AUTO HUNT: " .. (Settings.Enabled and "ON" or "OFF")
+        self.TextColor3 = Settings.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 255, 255)
+        if not Settings.Enabled then
+            if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+                LP.Character.Humanoid.WalkSpeed = 16
+                LP.Character.Humanoid.JumpPower = 50
             end
         end
-    end
-end)
+    end)
 
---================ NOCLIP =================
-RunService.Stepped:Connect(function()
-    if not State.Enabled then return end
-    for _,v in ipairs(Char:GetChildren()) do
-        if v:IsA("BasePart") then
-            v.CanCollide = false
+    CreateBtn("MODE: TWEEN (FLY)", function(self)
+        Settings.SilentHunt = not Settings.SilentHunt
+        self.Text = "MODE: " .. (Settings.SilentHunt and "SILENT HUNT (WALK)" or "TWEEN (FLY)")
+    end)
+
+    CreateBtn("SPAM SKILL: OFF", function(self)
+        Settings.SpamSkills = not Settings.SpamSkills
+        self.Text = "SPAM SKILL: " .. (Settings.SpamSkills and "ON" or "OFF")
+    end)
+
+    CreateBtn("SKILL MODE: CLICK", function(self)
+        if Settings.SkillMode == "Click" then
+            Settings.SkillMode = "Hold"
+        else
+            Settings.SkillMode = "Click"
         end
-    end
-end)
+        self.Text = "SKILL MODE: " .. string.upper(Settings.SkillMode)
+        StatusLbl.Text = "Mode: " .. Settings.SkillMode
+    end)
 
---================ UI =================
-local Gui = Instance.new("ScreenGui", game.CoreGui)
-Gui.ResetOnSpawn = false
+    CreateInput("Hold Time (s) [Default: 1]", function(text)
+        local num = tonumber(text)
+        if num then
+            Settings.HoldTime = num
+            StatusLbl.Text = "Hold Time: " .. num .. "s"
+        else
+            StatusLbl.Text = "Invalid Number!"
+        end
+    end)
 
-local Main = Instance.new("Frame", Gui)
-Main.Size = UDim2.fromOffset(320,400)
-Main.Position = UDim2.fromScale(0.5,0.25)
-Main.AnchorPoint = Vector2.new(0.5,0)
-Main.BackgroundColor3 = Color3.fromRGB(25,25,25)
-Main.Active = true
-Main.Draggable = true
-Instance.new("UICorner", Main)
+    CreateInput("Skills (e.g: Z,X,1,2)", function(text)
+        local list = {}
+        for s in string.gmatch(text, "[^,]+") do
+            local key = s:gsub("%s+", "")
+            table.insert(list, key)
+        end
+        if #list > 0 then
+            Settings.SkillList = list
+            StatusLbl.Text = "Saved: " .. table.concat(Settings.SkillList, " - ")
+        end
+    end)
 
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1,0,0,45)
-Title.Text = "DinoHunter QM"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 20
-Title.TextColor3 = Color3.new(1,1,1)
-Title.BackgroundTransparency = 1
-
-local function Button(txt,y)
-    local b = Instance.new("TextButton", Main)
-    b.Size = UDim2.new(1,-40,0,40)
-    b.Position = UDim2.new(0,20,0,y)
-    b.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    b.Text = txt
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 15
-    b.TextColor3 = Color3.new(1,1,1)
-    Instance.new("UICorner", b)
-    return b
+    CreateBtn("NEXT PLAYER (SKIP)", function()
+        if State.Target then
+            table.insert(State.IgnoreList, State.Target.Name)
+            State.Target = nil
+            StatusLbl.Text = "Skipped Target!"
+        end
+    end)
+    
+    return StatusLbl, ScreenGui
 end
 
-local Start = Button("BẬT AUTO",60)
-local Stop = Button("TẮT AUTO",110)
-local ToggleZX = Button("SPAM Z X: OFF",160)
-local Next = Button("NEXT PLAYER",210)
+local StatusLabel, MainGUI = CreateGUI()
 
---================ INFO =================
-local Info = Instance.new("TextLabel", Main)
-Info.Size = UDim2.new(1,-40,0,90)
-Info.Position = UDim2.new(0,20,0,260)
-Info.TextWrapped = true
-Info.Font = Enum.Font.Gotham
-Info.TextSize = 14
-Info.TextColor3 = Color3.new(1,1,1)
-Info.BackgroundTransparency = 1
+--================ CORE LOGIC ================
 
---================ BUTTON =================
-Start.MouseButton1Click:Connect(function()
-    if State.Enabled then return end
-    State.Enabled = true
-    State.AutoClick = true
-    State.Saved.WalkSpeed = Humanoid.WalkSpeed
-    State.Saved.JumpPower = Humanoid.JumpPower
-    State.Saved.Gravity = workspace.Gravity
-    Humanoid.WalkSpeed = 0
-    Humanoid.JumpPower = 0
-    workspace.Gravity = 0
-end)
-
-Stop.MouseButton1Click:Connect(function()
-    State.Enabled = false
-    State.AutoClick = false
-    State.SpamZX = false
-    ToggleZX.Text = "SPAM Z X: OFF"
-    Humanoid.WalkSpeed = State.Saved.WalkSpeed or 16
-    Humanoid.JumpPower = State.Saved.JumpPower or 50
-    workspace.Gravity = State.Saved.Gravity or 196.2
-end)
-
-ToggleZX.MouseButton1Click:Connect(function()
-    State.SpamZX = not State.SpamZX
-    ToggleZX.Text = "SPAM Z X: "..(State.SpamZX and "ON" or "OFF")
-end)
-
-Next.MouseButton1Click:Connect(function()
-    State.SkipTarget = true
-end)
-
---================ INFO UPDATE =================
-RunService.RenderStepped:Connect(function()
-    if not State.Enabled then
-        Info.Text = "Trạng thái: Tắt"
-        return
+local function IsAlive(plr)
+    if plr and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character:FindFirstChild("HumanoidRootPart") then
+        return plr.Character.Humanoid.Health > 0
     end
+    return false
+end
 
-    local curBounty = GetBounty(LP)
-    local diff = curBounty - State.StartBounty
-    local targetName = State.Target and State.Target.Name or "Không có"
+local function GetNearestEnemy()
+    local nearest = nil
+    local dist = math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and IsAlive(plr) then
+            local isIgnored = false
+            for _, name in ipairs(State.IgnoreList) do
+                if plr.Name == name then isIgnored = true break end
+            end
+            if not isIgnored then
+                local myPos = LP.Character.HumanoidRootPart.Position
+                local targetPos = plr.Character.HumanoidRootPart.Position
+                local mag = (myPos - targetPos).Magnitude
+                if mag < dist then
+                    dist = mag
+                    nearest = plr
+                end
+            end
+        end
+    end
+    return nearest
+end
 
-    Info.Text =
-        "Target: "..targetName..
-        "\nBounty: "..curBounty..
-        "\nThay đổi: "..(diff >= 0 and "+"..diff or diff)..
-        "\nSpam Z X: "..(State.SpamZX and "ON" or "OFF")
-end)
+local function EquipWeapon()
+    local char = LP.Character
+    if not char then return end
+    if not char:FindFirstChildWhichIsA("Tool") then
+        local bp = LP.Backpack
+        for _, v in ipairs(bp:GetChildren()) do
+            if v:IsA("Tool") and (v.ToolTip == "Melee" or v.ToolTip == "Sword") then
+                v.Parent = char
+                break
+            end
+        end
+        if not char:FindFirstChildWhichIsA("Tool") then
+            for _, v in ipairs(bp:GetChildren()) do
+                if v:IsA("Tool") then v.Parent = char break end
+            end
+        end
+    end
+end
 
-print("Dino Auto Bounty Loaded")
+local CurrentTween
+local function TweenMove(targetCFrame)
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local HRP = LP.Character.HumanoidRootPart
+    local dist = (HRP.Position - targetCFrame.Position).Magnitude
+    local time = dist / Settings.TweenSpeed
+    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
+    if CurrentTween then CurrentTween:Cancel() end
+    CurrentTween = TweenService:Create(HRP, ti, {CFrame = targetCFrame})
+    CurrentTween:Play()
+    
+    -- Noclip
+    for _, part in pairs(LP.Character:GetChildren()) do
+        if part:IsA("BasePart") then part.CanCollide = false end
+    end
+end
+
+local function SpamSkills()
+    if not Settings.SpamSkills or not State.Target then return end
+    
+    for _, keyStr in ipairs(Settings.SkillList) do
+        if not Settings.Enabled or not Settings.SpamSkills then break end
+
+        local key = Enum.KeyCode[string.upper(keyStr)]
+        if tonumber(keyStr) then
+            if keyStr == "1" then key = Enum.KeyCode.One end
+            if keyStr == "2" then key = Enum.KeyCode.Two end
+            if keyStr == "3" then key = Enum.KeyCode.Three end
+            if keyStr == "4" then key = Enum.KeyCode.Four end
+        end
+        
+        if key then
+            pcall(function()
+                if Settings.SkillMode == "Click" then
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                elseif Settings.SkillMode == "Hold" then
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                    task.wait(Settings.HoldTime)
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                end
+            end)
+        end
+        task.wait(0.1)
+    end
+end
+
+local function AutoClick()
+    if not Settings.Enabled then return end
+    pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    end)
+end
+
+--================ MAIN LOOPS ================
+
+-- Target Finder Loop
+table.insert(Connections, task.spawn(function()
+    while task.wait(0.5) do
+        if Settings.Enabled then
+            if not State.Target or not IsAlive(State.Target) then
+                State.Target = GetNearestEnemy()
+                if State.Target then
+                    StatusLabel.Text = "Target: " .. State.Target.Name
+                else
+                    StatusLabel.Text = "Scanning..."
+                end
+            end
+        end
+    end
+end))
+
+-- Movement & Attack Loop
+table.insert(Connections, RunService.Heartbeat:Connect(function()
+    if not Settings.Enabled or not IsAlive(LP) then return end
+    
+    local MyChar = LP.Character
+    local MyHRP = MyChar:FindFirstChild("HumanoidRootPart")
+    local MyHum = MyChar:FindFirstChild("Humanoid")
+    
+    if State.Target and IsAlive(State.Target) then
+        local EnemyHRP = State.Target.Character.HumanoidRootPart
+        local dist = (MyHRP.Position - EnemyHRP.Position).Magnitude
+        
+        if Settings.SilentHunt then
+            if CurrentTween then CurrentTween:Cancel() end
+            MyHum.WalkSpeed = Settings.WalkSpeed
+            MyHum.JumpPower = 60
+            MyHRP.CFrame = CFrame.new(MyHRP.Position, Vector3.new(EnemyHRP.Position.X, MyHRP.Position.Y, EnemyHRP.Position.Z))
+            if dist > 10 then
+                MyHum:MoveTo(EnemyHRP.Position)
+                if MyHum.FloorMaterial ~= Enum.Material.Air and dist < 20 then
+                    MyHum.Jump = true
+                end
+            end
+        else
+            MyHum.PlatformStand = true
+            local targetPos = EnemyHRP.Position + Vector3.new(0, Settings.HeightOffset, 0)
+            TweenMove(CFrame.new(targetPos, EnemyHRP.Position))
+        end
+        
+        if dist <= Settings.DistanceToAttack then
+            EquipWeapon()
+            AutoClick()
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", 0)
+            end)
+        end
+    else
+        if not Settings.SilentHunt and Settings.Enabled then
+            if MyHRP then MyHRP.Velocity = Vector3.new(0,0,0) end
+        end
+    end
+end))
+
+-- Skill Spammer Loop
+table.insert(Connections, task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.Enabled and Settings.SpamSkills and State.Target then
+            local dist = (LP.Character.HumanoidRootPart.Position - State.Target.Character.HumanoidRootPart.Position).Magnitude
+            if dist < 60 then
+                SpamSkills()
+            end
+        end
+    end
+end))
+
+-- Cleanup Function
+getgenv().DinoHunterCleanup = function()
+    for _, conn in pairs(Connections) do
+        if typeof(conn) == "RBXScriptConnection" then conn:Disconnect() end
+        if typeof(conn) == "thread" then task.cancel(conn) end
+    end
+    if MainGUI then MainGUI:Destroy() end
+    if CurrentTween then CurrentTween:Cancel() end
+    print("DinoHunter Unloaded")
+end
+
+print("DinoHunter v2.6 Loaded - Fixed UI Interaction")
