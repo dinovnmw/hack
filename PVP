@@ -166,9 +166,22 @@ end
 -- [[ PVP TAB ]]
 local PVPSection = Tabs.PVP:AddSection("Bot Logic")
 
-PVPSection:AddToggle("AutoPVP", {Title = "Enable Auto PVP", Default = true, Callback = function(v) 
-    loadstring(game:HttpGet('https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/Bountyhunt'))()
-end})
+PVPSection:AddButton({
+    Title = "Load Auto PVP (Bounty Hunt)",
+    Description = "Click để load Auto PVP script",
+    Callback = function()
+        loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/Bountyhunt"
+        ))()
+        
+        Fluent:Notify({
+            Title = "Auto PVP",
+            Content = "AutoBounty for all game by QM",
+            Duration = 3
+        })
+    end
+})
+
 
 -- [[ COMBAT TAB ]]
 local CombatSection = Tabs.Combat:AddSection("Assists")
