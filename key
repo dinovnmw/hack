@@ -1,0 +1,208 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+
+local API_URL = "https://dinokey.x10.mx/index.php?api=verify"
+local MAIN_URL = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP"
+local CACHE_FILE = "dino_key_cache.json"
+
+local expireTime = nil
+local isLifetime = false
+local cachedKey = nil
+
+pcall(function()
+  StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All,false)
+end)
+
+-- ================= HWID =================
+local function getHWID()
+  return RbxAnalyticsService:GetClientId()
+end
+
+-- ================= API VERIFY =================
+local function verifyKey(key)
+  local url = API_URL
+    .."&key="..HttpService:UrlEncode(key)
+    .."&hwid="..HttpService:UrlEncode(getHWID())
+
+  local res = game:HttpGet(url)
+  return HttpService:JSONDecode(res)
+end
+
+-- ================= LOAD MAIN =================
+local function loadMain()
+  loadstring(game:HttpGet(MAIN_URL))()
+end
+
+-- ================= CHECK CACHE =================
+local function checkCachedKey()
+  if not (isfile and isfile(CACHE_FILE)) then
+    return false
+  end
+
+  local cache
+  local ok = pcall(function()
+    cache = HttpService:JSONDecode(readfile(CACHE_FILE))
+  end)
+  if not ok or not cache.key or not cache.time then
+    return false
+  end
+
+  -- quá 24h thì bắt nhập lại
+  if os.time() - cache.time > 86400 then
+    return false
+  end
+
+  -- bắt buộc verify lại với server
+  local ok2,res = pcall(function()
+    return verifyKey(cache.key)
+  end)
+  if not ok2 or res.status ~= "success" then
+    return false
+  end
+
+  cachedKey = cache.key
+  isLifetime = res.is_lifetime == 1
+  expireTime = res.expire_time
+
+  return true
+end
+
+-- ================= UI =================
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "DinoKeyUI"
+
+local blur = Instance.new("BlurEffect", Lighting)
+blur.Size = 18
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.35,0.42)
+frame.Position = UDim2.fromScale(0.5,0.5)
+frame.AnchorPoint = Vector2.new(0.5,0.5)
+frame.BackgroundColor3 = Color3.fromRGB(18,18,26)
+Instance.new("UICorner",frame).CornerRadius=UDim.new(0,18)
+
+local title = Instance.new("TextLabel",frame)
+title.Size = UDim2.new(1,0,0.22,0)
+title.BackgroundTransparency=1
+title.Text="DINO KEY SYSTEM"
+title.Font=Enum.Font.GothamBlack
+title.TextSize=26
+title.TextColor3=Color3.fromRGB(0,200,255)
+
+local status = Instance.new("TextLabel",frame)
+status.Size = UDim2.new(1,0,0.12,0)
+status.Position=UDim2.new(0,0,0.22,0)
+status.BackgroundTransparency=1
+status.Text="Enter your key"
+status.Font=Enum.Font.Gotham
+status.TextSize=14
+status.TextColor3=Color3.fromRGB(180,180,200)
+
+local timerLabel = Instance.new("TextLabel",frame)
+timerLabel.Size = UDim2.new(1,0,0.12,0)
+timerLabel.Position=UDim2.new(0,0,0.34,0)
+timerLabel.BackgroundTransparency=1
+timerLabel.Text=""
+timerLabel.Font=Enum.Font.Gotham
+timerLabel.TextSize=14
+timerLabel.TextColor3=Color3.fromRGB(120,220,255)
+
+local box = Instance.new("TextBox",frame)
+box.Size=UDim2.new(0.85,0,0.16,0)
+box.Position=UDim2.new(0.075,0,0.48,0)
+box.PlaceholderText="XXXX-XXXX-XXXX"
+box.Font=Enum.Font.Gotham
+box.TextSize=16
+box.BackgroundColor3=Color3.fromRGB(30,30,40)
+box.TextColor3=Color3.new(1,1,1)
+Instance.new("UICorner",box).CornerRadius=UDim.new(0,12)
+
+local btn = Instance.new("TextButton",frame)
+btn.Size=UDim2.new(0.55,0,0.16,0)
+btn.Position=UDim2.new(0.225,0,0.70,0)
+btn.Text="VERIFY"
+btn.Font=Enum.Font.GothamBold
+btn.TextSize=18
+btn.BackgroundColor3=Color3.fromRGB(0,170,255)
+btn.TextColor3=Color3.new(1,1,1)
+Instance.new("UICorner",btn).CornerRadius=UDim.new(0,14)
+
+local function formatTime(sec)
+  local d = math.floor(sec/86400)
+  local h = math.floor(sec%86400/3600)
+  local m = math.floor(sec%3600/60)
+  if d>0 then
+    return string.format("%dd %02dh %02dm",d,h,m)
+  else
+    return string.format("%02dh %02dm",h,m)
+  end
+end
+
+-- ================= BUTTON =================
+btn.MouseButton1Click:Connect(function()
+  local key = box.Text:gsub("%s+","")
+  if key=="" then return end
+
+  status.Text="Checking key..."
+  btn.Active=false
+
+  local ok,res = pcall(function()
+    return verifyKey(key)
+  end)
+
+  if ok and res.status=="success" then
+    isLifetime = res.is_lifetime == 1
+    expireTime = res.expire_time
+
+    if writefile then
+      writefile(CACHE_FILE,HttpService:JSONEncode({
+        key = key,
+        time = os.time(),
+        life = isLifetime,
+        expire = expireTime
+      }))
+    end
+
+    gui:Destroy()
+    blur:Destroy()
+    loadMain()
+  else
+    status.Text="Invalid key or HWID"
+    btn.Active=true
+  end
+end)
+
+-- ================= TIMER =================
+RunService.RenderStepped:Connect(function()
+  if not isLifetime and expireTime then
+    local remain = expireTime - os.time()
+    if remain > 0 then
+      timerLabel.Text = "Time left: "..formatTime(remain)
+    else
+      timerLabel.Text = "Key expired"
+    end
+  elseif isLifetime then
+    timerLabel.Text = "Lifetime Key"
+  end
+end)
+
+-- ================= AUTO CHECK CACHE =================
+task.spawn(function()
+  status.Text="Checking saved key..."
+  if checkCachedKey() then
+    gui:Destroy()
+    blur:Destroy()
+    loadMain()
+  else
+    status.Text="Enter your key"
+  end
+end)
