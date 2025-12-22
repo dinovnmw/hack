@@ -1,343 +1,467 @@
+giảm tốc độ walk cho như chạy và khi script chạy sẽ tự có aimbot và sửa là spam skill là spam lần lượt 1-delay-2,... và cải thiện giao diên
+
+
 --[[
-    DinoPVP V2 - Ultimate Upgrade
-    Library: Fluent (Dawid-Scripts)
+    DINO HUNTER QM - FIXED & OPTIMIZED (v2.6)
+    Fixes:
+    - Fixed buttons not being clickable (Switched to Activated event).
+    - Fixed dragging logic causing input conflicts.
+    - Added proper script cleanup (prevents lag when re-executing).
+    - Added pcall safety for VirtualInputManager.
 ]]
 
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+--================ PREVENT MULTIPLE EXECUTIONS ================
+if getgenv().DinoHunterLoaded then
+    if getgenv().DinoHunterCleanup then getgenv().DinoHunterCleanup() end
+end
+getgenv().DinoHunterLoaded = true
 
--- ================= SERVICES =================
+--================ SERVICES ================
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
--- ================= VARIABLES =================
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
+local LP = Players.LocalPlayer
+local Mouse = LP:GetMouse()
+local Camera = workspace.CurrentCamera
 
--- Global State
+--================ SETTINGS & STATE ================
+local Settings = {
+    Enabled = false,
+    SilentHunt = false,
+    SpamSkills = false,
+    SkillList = {"Z", "X"},
+    SkillMode = "Click", -- "Click" or "Hold"
+    HoldTime = 1.0,
+    
+    ClickDelay = 0.1,
+    TweenSpeed = 250,
+    WalkSpeed = 120,
+    DistanceToAttack = 60,
+    HeightOffset = 5,
+}
+
 local State = {
-    CurrentTarget = nil,
-    IsRetreating = false,
-    ActiveTween = nil
+    Target = nil,
+    IgnoreList = {},
+    GuiVisible = true
 }
 
--- ================= UI SETUP =================
-local Window = Fluent:CreateWindow({
-    Title = "DinoPVP V2",
-    SubTitle = "Quang Minh",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
-    Theme = "Amethyst",
-    MinimizeKey = Enum.KeyCode.RightControl
-})
+local Connections = {} -- Store connections to clean them up later
 
-local Tabs = {
-    PVP = Window:AddTab({ Title = "Auto PVP", Icon = "swords" }),
-    Combat = Window:AddTab({ Title = "Combat", Icon = "crosshair" }),
-    Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
-    Movement = Window:AddTab({ Title = "Movement", Icon = "move" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-}
-
-local Options = Fluent.Options
-
--- ================= CONFIGURATION =================
--- These values are controlled by the UI
-local Config = {
-    AutoPVP = false,
-    RetreatHP = 30,
-    EngageHP = 80,
-    TweenSpeed = 200,
-    DistanceCheck = 1000,
-    
-    Aimbot = false,
-    AimbotFOV = 150,
-    AimbotSmooth = 0.5,
-    AimbotPart = "Head",
-    
-    Hitbox = false,
-    HitboxSize = 5,
-    
-    ESP = false,
-    ESPTeamCheck = true,
-    
-    WalkSpeed = 16,
-    JumpPower = 50,
-    Noclip = false,
-    InfJump = false,
-    WalkWater = false
-}
-
--- ================= HELPER FUNCTIONS =================
-
--- Check if a player is a valid enemy
-local function IsValidEnemy(plr)
-    if not plr or plr == LocalPlayer or not plr.Character then return false end
-    local hum = plr.Character:FindFirstChild("Humanoid")
-    local root = plr.Character:FindFirstChild("HumanoidRootPart")
-    
-    if not hum or not root or hum.Health <= 0 then return false end
-    
-    -- Team Check
-    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-        return false
+--================ UI LIBRARY (FIXED) ================
+local function CreateGUI()
+    -- Cleanup old GUI
+    for _, v in pairs(CoreGui:GetChildren()) do
+        if v.Name == "DinoHunterUI" then v:Destroy() end
     end
-    
-    -- ForceField Check (Optional)
-    if plr.Character:FindFirstChild("ForceField") then return false end
-    
-    return true
-end
 
--- Get Nearest Enemy Logic
-local function GetNearestTarget(maxDist, useMouse)
-    local closestPlr = nil
-    local shortestDist = maxDist or math.huge
-    
-    for _, v in pairs(Players:GetPlayers()) do
-        if IsValidEnemy(v) then
-            local dist
-            if useMouse then
-                -- Distance from Mouse Cursor (for Aimbot)
-                local vector, onScreen = Camera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
-                if onScreen then
-                    local mouseDist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(vector.X, vector.Y)).Magnitude
-                    if mouseDist < shortestDist then
-                        closestPlr = v
-                        shortestDist = mouseDist
-                    end
-                end
-            else
-                -- Distance from Character (for Auto PVP)
-                dist = (LocalPlayer.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
-                if dist < shortestDist then
-                    closestPlr = v
-                    shortestDist = dist
-                end
-            end
-        end
-    end
-    return closestPlr
-end
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "DinoHunterUI"
+    -- Use gethui() if available for better security, else CoreGui, else PlayerGui
+    local parent = (gethui and gethui()) or CoreGui or LP:WaitForChild("PlayerGui")
+    ScreenGui.Parent = parent
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.ResetOnSpawn = false
 
--- Safe Tween Function
-local function TweenCharacter(cframe)
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    
-    local hrp = char.HumanoidRootPart
-    local dist = (hrp.Position - cframe.Position).Magnitude
-    
-    -- Calculate time based on speed
-    local time = dist / Config.TweenSpeed
-    
-    -- Cancel old tween if exists
-    if State.ActiveTween then State.ActiveTween:Cancel() end
-    
-    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
-    State.ActiveTween = TweenService:Create(hrp, ti, {CFrame = cframe})
-    State.ActiveTween:Play()
-    
-    -- Noclip while tweening to prevent getting stuck
-    if dist > 5 then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
-        end
-    end
-end
-
--- Click Simulation
-local function AttackClick()
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-    task.wait(0.01)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-end
-
--- ================= UI ELEMENTS =================
-
--- [[ PVP TAB ]]
-local PVPSection = Tabs.PVP:AddSection("Bot Logic")
-
-PVPSection:AddButton({
-    Title = "Load Auto PVP (Bounty Hunt)",
-    Description = "Click để load Auto PVP script",
-    Callback = function()
-        loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/Bountyhunt"
-        ))()
+    --// DRAG FUNCTION (FIXED)
+    local function MakeDraggable(frame, handle)
+        handle = handle or frame
+        local dragging, dragInput, dragStart, startPos
         
-        Fluent:Notify({
-            Title = "Auto PVP",
-            Content = "AutoBounty for all game by QM",
-            Duration = 3
-        })
+        local function update(input)
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+
+        table.insert(Connections, handle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = frame.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end))
+
+        table.insert(Connections, handle.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end))
+
+        table.insert(Connections, UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                update(input)
+            end
+        end))
     end
-})
 
+    --// TOGGLE BUTTON
+    local ToggleBtn = Instance.new("ImageButton")
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Parent = ScreenGui
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ToggleBtn.Position = UDim2.new(0.1, 0, 0.1, 0)
+    ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+    ToggleBtn.Image = "rbxassetid://3926305904"
+    ToggleBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleBtn.Active = true
+    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+    
+    MakeDraggable(ToggleBtn)
 
--- [[ COMBAT TAB ]]
-local CombatSection = Tabs.Combat:AddSection("Assists")
+    --// MAIN FRAME
+    local Main = Instance.new("Frame")
+    Main.Name = "MainFrame"
+    Main.Parent = ScreenGui
+    Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Main.Position = UDim2.new(0.5, -150, 0.5, -225)
+    Main.Size = UDim2.new(0, 300, 0, 450)
+    Main.BorderSizePixel = 0
+    Main.Active = true -- Important for input handling
+    Main.ClipsDescendants = true
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
 
-CombatSection:AddToggle("Aimbot", {Title = "Camera Aimbot", Default = false, Callback = function(v) Config.Aimbot = v end})
-CombatSection:AddDropdown("AimPart", {Title = "Aim Part", Values = {"Head", "HumanoidRootPart", "Torso"}, Default = "Head", Multi = false, Callback = function(v) Config.AimbotPart = v end})
-CombatSection:AddSlider("FOV", {Title = "Aimbot FOV", Min = 20, Max = 800, Default = 150, Rounding = 0, Callback = function(v) Config.AimbotFOV = v end})
+    MakeDraggable(Main) -- Make the main frame draggable too
 
-CombatSection:AddToggle("Hitbox", {Title = "Hitbox Expander", Default = false, Callback = function(v) Config.Hitbox = v end})
-CombatSection:AddSlider("HitboxSize", {Title = "Hitbox Size", Min = 2, Max = 25, Default = 5, Rounding = 0, Callback = function(v) Config.HitboxSize = v end})
+    local Title = Instance.new("TextLabel")
+    Title.Parent = Main
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 0, 0, 0)
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "DINO HUNTER BY QM"
+    Title.TextColor3 = Color3.fromRGB(255, 65, 65)
+    Title.TextSize = 20
 
--- [[ VISUALS TAB ]]
-local VisualsSection = Tabs.Visuals:AddSection("ESP")
-VisualsSection:AddToggle("ESP", {Title = "Enable ESP", Default = false, Callback = function(v) Config.ESP = v end})
-VisualsSection:AddToggle("ESPTeam", {Title = "Team Check", Default = true, Callback = function(v) Config.ESPTeamCheck = v end})
+    -- Toggle Logic
+    ToggleBtn.Activated:Connect(function()
+        State.GuiVisible = not State.GuiVisible
+        Main.Visible = State.GuiVisible
+    end)
 
--- [[ MOVEMENT TAB ]]
-local MoveSection = Tabs.Movement:AddSection("Local Player")
-MoveSection:AddSlider("WS", {Title = "WalkSpeed", Min = 16, Max = 250, Default = 16, Rounding = 0, Callback = function(v) Config.WalkSpeed = v end})
-MoveSection:AddSlider("JP", {Title = "JumpPower", Min = 50, Max = 300, Default = 50, Rounding = 0, Callback = function(v) Config.JumpPower = v end})
-MoveSection:AddToggle("Noclip", {Title = "Noclip", Default = false, Callback = function(v) Config.Noclip = v end})
-MoveSection:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callback = function(v) Config.InfJump = v end})
-MoveSection:AddToggle("WaterWalk", {Title = "Walk On Water", Default = false, Callback = function(v) Config.WalkWater = v end})
+    --// ELEMENTS GENERATOR
+    local yOffset = 50
+    local function CreateBtn(text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Parent = Main
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        btn.Position = UDim2.new(0.05, 0, 0, yOffset)
+        btn.Size = UDim2.new(0.9, 0, 0, 35)
+        btn.Font = Enum.Font.GothamSemibold
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 14
+        btn.AutoButtonColor = true
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        
+        -- Use Activated instead of MouseButton1Click for better compatibility
+        btn.Activated:Connect(function()
+            callback(btn)
+        end)
+        yOffset = yOffset + 40
+        return btn
+    end
 
--- [[ SETTINGS TAB ]]
-Tabs.Settings:AddButton({
-    Title = "FPS Boost / Fix Lag",
-    Description = "Removes textures to improve performance",
-    Callback = function()
-        for _, v in pairs(game:GetDescendants()) do
-            if v:IsA("Part") or v:IsA("MeshPart") then
-                v.Material = Enum.Material.SmoothPlastic
-                v.Reflectance = 0
-            elseif v:IsA("Decal") or v:IsA("Texture") then
-                v.Transparency = 1
+    local function CreateInput(placeholder, callback)
+        local box = Instance.new("TextBox")
+        box.Parent = Main
+        box.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        box.Position = UDim2.new(0.05, 0, 0, yOffset)
+        box.Size = UDim2.new(0.9, 0, 0, 35)
+        box.Font = Enum.Font.Gotham
+        box.PlaceholderText = placeholder
+        box.Text = ""
+        box.TextColor3 = Color3.fromRGB(255, 255, 255)
+        box.TextSize = 14
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+        
+        box.FocusLost:Connect(function()
+            callback(box.Text)
+        end)
+        yOffset = yOffset + 40
+        return box
+    end
+
+    local StatusLbl = Instance.new("TextLabel")
+    StatusLbl.Parent = Main
+    StatusLbl.BackgroundTransparency = 1
+    StatusLbl.Position = UDim2.new(0.05, 0, 0.9, 0)
+    StatusLbl.Size = UDim2.new(0.9, 0, 0, 40)
+    StatusLbl.Font = Enum.Font.Gotham
+    StatusLbl.Text = "Status: Idle"
+    StatusLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    StatusLbl.TextSize = 12
+    StatusLbl.TextWrapped = true
+    StatusLbl.TextYAlignment = Enum.TextYAlignment.Top
+
+    --// BUTTONS CONFIG
+    CreateBtn("AUTO HUNT: OFF", function(self)
+        Settings.Enabled = not Settings.Enabled
+        self.Text = "AUTO HUNT: " .. (Settings.Enabled and "ON" or "OFF")
+        self.TextColor3 = Settings.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 255, 255)
+        if not Settings.Enabled then
+            if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+                LP.Character.Humanoid.WalkSpeed = 16
+                LP.Character.Humanoid.JumpPower = 50
             end
         end
-        Lighting.GlobalShadows = false
-        Fluent:Notify({Title = "Success", Content = "FPS Boost Applied", Duration = 3})
-    end
-})
+    end)
 
--- ================= MAIN LOOPS =================
--- 2. AIMBOT & VISUALS LOOP (RenderStepped)
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
+    CreateBtn("MODE: TWEEN (FLY)", function(self)
+        Settings.SilentHunt = not Settings.SilentHunt
+        self.Text = "MODE: " .. (Settings.SilentHunt and "SILENT HUNT (WALK)" or "TWEEN (FLY)")
+    end)
 
-RunService.RenderStepped:Connect(function()
-    -- Update FOV Circle
-    FOVCircle.Visible = Config.Aimbot
-    FOVCircle.Radius = Config.AimbotFOV
-    FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
-    
-    -- Aimbot Logic
-    if Config.Aimbot then
-        local target = GetNearestTarget(Config.AimbotFOV, true)
-        if target and target.Character and target.Character:FindFirstChild(Config.AimbotPart) then
-            local tPos = target.Character[Config.AimbotPart].Position
-            local curCFrame = Camera.CFrame
-            local newCFrame = CFrame.new(curCFrame.Position, tPos)
-            Camera.CFrame = curCFrame:Lerp(newCFrame, Config.AimbotSmooth)
+    CreateBtn("SPAM SKILL: OFF", function(self)
+        Settings.SpamSkills = not Settings.SpamSkills
+        self.Text = "SPAM SKILL: " .. (Settings.SpamSkills and "ON" or "OFF")
+    end)
+
+    CreateBtn("SKILL MODE: CLICK", function(self)
+        if Settings.SkillMode == "Click" then
+            Settings.SkillMode = "Hold"
+        else
+            Settings.SkillMode = "Click"
         end
-    end
+        self.Text = "SKILL MODE: " .. string.upper(Settings.SkillMode)
+        StatusLbl.Text = "Mode: " .. Settings.SkillMode
+    end)
+
+    CreateInput("Hold Time (s) [Default: 1]", function(text)
+        local num = tonumber(text)
+        if num then
+            Settings.HoldTime = num
+            StatusLbl.Text = "Hold Time: " .. num .. "s"
+        else
+            StatusLbl.Text = "Invalid Number!"
+        end
+    end)
+
+    CreateInput("Skills (e.g: Z,X,1,2)", function(text)
+        local list = {}
+        for s in string.gmatch(text, "[^,]+") do
+            local key = s:gsub("%s+", "")
+            table.insert(list, key)
+        end
+        if #list > 0 then
+            Settings.SkillList = list
+            StatusLbl.Text = "Saved: " .. table.concat(Settings.SkillList, " - ")
+        end
+    end)
+
+    CreateBtn("NEXT PLAYER (SKIP)", function()
+        if State.Target then
+            table.insert(State.IgnoreList, State.Target.Name)
+            State.Target = nil
+            StatusLbl.Text = "Skipped Target!"
+        end
+    end)
     
-    -- ESP Manager
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character then
-            local hasHighlight = v.Character:FindFirstChild("DinoESP")
-            
-            if Config.ESP and IsValidEnemy(v) then
-                if not hasHighlight then
-                    local hl = Instance.new("Highlight")
-                    hl.Name = "DinoESP"
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.FillTransparency = 0.5
-                    hl.Parent = v.Character
+    return StatusLbl, ScreenGui
+end
+
+local StatusLabel, MainGUI = CreateGUI()
+
+--================ CORE LOGIC ================
+
+local function IsAlive(plr)
+    if plr and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character:FindFirstChild("HumanoidRootPart") then
+        return plr.Character.Humanoid.Health > 0
+    end
+    return false
+end
+
+local function GetNearestEnemy()
+    local nearest = nil
+    local dist = math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and IsAlive(plr) then
+            local isIgnored = false
+            for _, name in ipairs(State.IgnoreList) do
+                if plr.Name == name then isIgnored = true break end
+            end
+            if not isIgnored then
+                local myPos = LP.Character.HumanoidRootPart.Position
+                local targetPos = plr.Character.HumanoidRootPart.Position
+                local mag = (myPos - targetPos).Magnitude
+                if mag < dist then
+                    dist = mag
+                    nearest = plr
                 end
-            else
-                if hasHighlight then hasHighlight:Destroy() end
             end
         end
     end
-end)
+    return nearest
+end
 
--- 3. PHYSICS LOOP (Stepped)
-RunService.Stepped:Connect(function()
-    local char = LocalPlayer.Character
+local function EquipWeapon()
+    local char = LP.Character
     if not char then return end
-    
-    -- WalkSpeed & JumpPower
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        if hum.WalkSpeed ~= Config.WalkSpeed then hum.WalkSpeed = Config.WalkSpeed end
-        if hum.JumpPower ~= Config.JumpPower then hum.JumpPower = Config.JumpPower end
+    if not char:FindFirstChildWhichIsA("Tool") then
+        local bp = LP.Backpack
+        for _, v in ipairs(bp:GetChildren()) do
+            if v:IsA("Tool") and (v.ToolTip == "Melee" or v.ToolTip == "Sword") then
+                v.Parent = char
+                break
+            end
+        end
+        if not char:FindFirstChildWhichIsA("Tool") then
+            for _, v in ipairs(bp:GetChildren()) do
+                if v:IsA("Tool") then v.Parent = char break end
+            end
+        end
     end
+end
+
+local CurrentTween
+local function TweenMove(targetCFrame)
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local HRP = LP.Character.HumanoidRootPart
+    local dist = (HRP.Position - targetCFrame.Position).Magnitude
+    local time = dist / Settings.TweenSpeed
+    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
+    if CurrentTween then CurrentTween:Cancel() end
+    CurrentTween = TweenService:Create(HRP, ti, {CFrame = targetCFrame})
+    CurrentTween:Play()
     
     -- Noclip
-    if Config.Noclip then
-        for _, v in pairs(char:GetDescendants()) do
-            if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
-        end
+    for _, part in pairs(LP.Character:GetChildren()) do
+        if part:IsA("BasePart") then part.CanCollide = false end
     end
+end
+
+local function SpamSkills()
+    if not Settings.SpamSkills or not State.Target then return end
     
-    -- Hitbox Expander
-    if Config.Hitbox then
-        for _, v in pairs(Players:GetPlayers()) do
-            if v ~= LocalPlayer and IsValidEnemy(v) then
-                local hrp = v.Character.HumanoidRootPart
-                hrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
-                hrp.Transparency = 0.6
-                hrp.CanCollide = false
-            end
+    for _, keyStr in ipairs(Settings.SkillList) do
+        if not Settings.Enabled or not Settings.SpamSkills then break end
+
+        local key = Enum.KeyCode[string.upper(keyStr)]
+        if tonumber(keyStr) then
+            if keyStr == "1" then key = Enum.KeyCode.One end
+            if keyStr == "2" then key = Enum.KeyCode.Two end
+            if keyStr == "3" then key = Enum.KeyCode.Three end
+            if keyStr == "4" then key = Enum.KeyCode.Four end
         end
+        
+        if key then
+            pcall(function()
+                if Settings.SkillMode == "Click" then
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                elseif Settings.SkillMode == "Hold" then
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                    task.wait(Settings.HoldTime)
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                end
+            end)
+        end
+        task.wait(0.1)
     end
-    
-    -- Walk on Water
-    if Config.WalkWater then
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local params = RaycastParams.new()
-            params.FilterDescendantsInstances = {char}
-            params.FilterType = Enum.RaycastFilterType.Exclude
-            
-            local ray = Workspace:Raycast(hrp.Position, Vector3.new(0, -5, 0), params)
-            if ray and ray.Material == Enum.Material.Water then
-                hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
-                -- Keep player slightly above water
-                if hrp.Position.Y < ray.Position.Y + 2 then
-                     hrp.CFrame = CFrame.new(hrp.Position.X, ray.Position.Y + 3, hrp.Position.Z)
+end
+
+local function AutoClick()
+    if not Settings.Enabled then return end
+    pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    end)
+end
+
+--================ MAIN LOOPS ================
+
+-- Target Finder Loop
+table.insert(Connections, task.spawn(function()
+    while task.wait(0.5) do
+        if Settings.Enabled then
+            if not State.Target or not IsAlive(State.Target) then
+                State.Target = GetNearestEnemy()
+                if State.Target then
+                    StatusLabel.Text = "Target: " .. State.Target.Name
+                else
+                    StatusLabel.Text = "Scanning..."
                 end
             end
         end
     end
-end)
+end))
 
--- Infinite Jump
-game:GetService("UserInputService").JumpRequest:Connect(function()
-    if Config.InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid:ChangeState("Jumping")
+-- Movement & Attack Loop
+table.insert(Connections, RunService.Heartbeat:Connect(function()
+    if not Settings.Enabled or not IsAlive(LP) then return end
+    
+    local MyChar = LP.Character
+    local MyHRP = MyChar:FindFirstChild("HumanoidRootPart")
+    local MyHum = MyChar:FindFirstChild("Humanoid")
+    
+    if State.Target and IsAlive(State.Target) then
+        local EnemyHRP = State.Target.Character.HumanoidRootPart
+        local dist = (MyHRP.Position - EnemyHRP.Position).Magnitude
+        
+        if Settings.SilentHunt then
+            if CurrentTween then CurrentTween:Cancel() end
+            MyHum.WalkSpeed = Settings.WalkSpeed
+            MyHum.JumpPower = 60
+            MyHRP.CFrame = CFrame.new(MyHRP.Position, Vector3.new(EnemyHRP.Position.X, MyHRP.Position.Y, EnemyHRP.Position.Z))
+            if dist > 10 then
+                MyHum:MoveTo(EnemyHRP.Position)
+                if MyHum.FloorMaterial ~= Enum.Material.Air and dist < 20 then
+                    MyHum.Jump = true
+                end
+            end
+        else
+            MyHum.PlatformStand = true
+            local targetPos = EnemyHRP.Position + Vector3.new(0, Settings.HeightOffset, 0)
+            TweenMove(CFrame.new(targetPos, EnemyHRP.Position))
+        end
+        
+        if dist <= Settings.DistanceToAttack then
+            EquipWeapon()
+            AutoClick()
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", 0)
+            end)
+        end
+    else
+        if not Settings.SilentHunt and Settings.Enabled then
+            if MyHRP then MyHRP.Velocity = Vector3.new(0,0,0) end
+        end
     end
-end)
+end))
 
--- ================= FINALIZE =================
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetFolder("DinoPVP_V2")
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+-- Skill Spammer Loop
+table.insert(Connections, task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.Enabled and Settings.SpamSkills and State.Target then
+            local dist = (LP.Character.HumanoidRootPart.Position - State.Target.Character.HumanoidRootPart.Position).Magnitude
+            if dist < 60 then
+                SpamSkills()
+            end
+        end
+    end
+end))
 
-Window:SelectTab(1)
+-- Cleanup Function
+getgenv().DinoHunterCleanup = function()
+    for _, conn in pairs(Connections) do
+        if typeof(conn) == "RBXScriptConnection" then conn:Disconnect() end
+        if typeof(conn) == "thread" then task.cancel(conn) end
+    end
+    if MainGUI then MainGUI:Destroy() end
+    if CurrentTween then CurrentTween:Cancel() end
+    print("DinoHunter Unloaded")
+end
 
-Fluent:Notify({
-    Title = "DinoPVP V2 Loaded",
-    Content = "Script upgraded and optimized successfully!",
-    Duration = 5
-})
+print("DinoHunter v2.6 Loaded - Fixed UI Interaction")
