@@ -27,7 +27,7 @@ local Config = {
     AimMode = "Nearest Character", -- Options: "Nearest Character", "Specific Player"
     SelectedTarget = "",
     AimPart = "Head",
-    AimSmooth = 0, -- 0 = Instant Lock (Rage), 1 = Legit
+    AimSmooth = 0.1, -- 0 = Instant Lock (Rage), 1 = Legit
     
     -- Combat
     KillAura = false,
@@ -53,8 +53,8 @@ local Config = {
 
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP V4 | Ultimate Upgrade",
-    SubTitle = "Rage & Legion",
+    Title = "DinoPVP",
+    SubTitle = "by CNo",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -69,6 +69,57 @@ local Tabs = {
     Movement = Window:AddTab({ Title = "Movement", Icon = "move" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
+
+-- ================= MOBILE UI TOGGLE ICON (FIXED) =================
+
+local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+local ToggleGui = Instance.new("ScreenGui")
+ToggleGui.Name = "DinoMobileToggle"
+ToggleGui.IgnoreGuiInset = true
+ToggleGui.ResetOnSpawn = false
+ToggleGui.DisplayOrder = 999999
+ToggleGui.Enabled = true
+ToggleGui.Parent = PlayerGui
+
+local ToggleBtn = Instance.new("ImageButton")
+ToggleBtn.Name = "ToggleButton"
+ToggleBtn.Parent = ToggleGui
+ToggleBtn.Size = UDim2.fromOffset(60, 60)
+ToggleBtn.Position = UDim2.new(0, 20, 0.5, -30)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ToggleBtn.BackgroundTransparency = 0
+ToggleBtn.AutoButtonColor = false
+ToggleBtn.ZIndex = 999999
+ToggleBtn.Image = "rbxassetid://7072719338"
+ToggleBtn.ScaleType = Enum.ScaleType.Fit
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = ToggleBtn
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(255, 80, 80)
+UIStroke.Parent = ToggleBtn
+
+-- Hiệu ứng nhấn
+ToggleBtn.MouseButton1Down:Connect(function()
+    ToggleBtn.Size = UDim2.fromOffset(54, 54)
+end)
+
+ToggleBtn.MouseButton1Up:Connect(function()
+    ToggleBtn.Size = UDim2.fromOffset(60, 60)
+end)
+
+-- Toggle Fluent UI
+ToggleBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        Window:Minimize()
+    end)
+end)
 
 local Options = Fluent.Options
 
@@ -431,13 +482,13 @@ end)
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetFolder("DinoPVP_V4")
+SaveManager:SetFolder("DinoPVP")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 
 Window:SelectTab(1)
 
 Fluent:Notify({
-    Title = "DinoPVP V4 Loaded",
+    Title = "DinoPVP Loaded",
     Content = "Script Upgraded. Aimbot & PVP Ready.",
     Duration = 5
 })
