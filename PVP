@@ -1,6 +1,8 @@
 --[[
-    DinoPVP V1
+    DinoPVP V2 - Ultimate Upgrade
     Library: Fluent
+    Language: Lua
+    Author: AI Generated
 ]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -53,8 +55,8 @@ local Config = {
 
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP",
-    SubTitle = "by CNo",
+    Title = "DinoPVP V2",
+    SubTitle = "Ultimate PVP Suite",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -70,62 +72,48 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
--- ================= MOBILE UI TOGGLE ICON (FIXED) =================
+-- ================= MOBILE UI TOGGLE ICON =================
+-- This creates a button on screen to open/close the menu on Mobile/PC
+local function CreateMobileToggle()
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    if PlayerGui:FindFirstChild("DinoMobileToggle") then return end
 
-local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    local ToggleGui = Instance.new("ScreenGui")
+    ToggleGui.Name = "DinoMobileToggle"
+    ToggleGui.IgnoreGuiInset = true
+    ToggleGui.ResetOnSpawn = false
+    ToggleGui.DisplayOrder = 999999
+    ToggleGui.Parent = PlayerGui
 
-local ToggleGui = Instance.new("ScreenGui")
-ToggleGui.Name = "DinoMobileToggle"
-ToggleGui.IgnoreGuiInset = true
-ToggleGui.ResetOnSpawn = false
-ToggleGui.DisplayOrder = 999999
-ToggleGui.Enabled = true
-ToggleGui.Parent = PlayerGui
+    local ToggleBtn = Instance.new("ImageButton")
+    ToggleBtn.Name = "ToggleButton"
+    ToggleBtn.Parent = ToggleGui
+    ToggleBtn.Size = UDim2.fromOffset(50, 50)
+    ToggleBtn.Position = UDim2.new(0, 20, 0.4, 0)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ToggleBtn.BackgroundTransparency = 0.2
+    ToggleBtn.BorderSizePixel = 0
+    ToggleBtn.Image = "rbxassetid://13350795660" -- Fluent Icon or similar
+    ToggleBtn.Active = true
+    ToggleBtn.Draggable = true
 
-local ToggleBtn = Instance.new("ImageButton")
-ToggleBtn.Name = "ToggleButton"
-ToggleBtn.Parent = ToggleGui
-ToggleBtn.Size = UDim2.fromOffset(60, 60)
-ToggleBtn.Position = UDim2.new(0, 20, 0.5, -30)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-ToggleBtn.BackgroundTransparency = 0
-ToggleBtn.AutoButtonColor = false
-ToggleBtn.ZIndex = 999999
-ToggleBtn.Image = "rbxassetid://7072719338"
-ToggleBtn.ScaleType = Enum.ScaleType.Fit
-ToggleBtn.Active = true
-ToggleBtn.Draggable = true
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(1, 0)
+    UICorner.Parent = ToggleBtn
+    
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Color = Color3.fromRGB(100, 100, 255)
+    UIStroke.Thickness = 2
+    UIStroke.Parent = ToggleBtn
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(1, 0)
-UICorner.Parent = ToggleBtn
-
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 2
-UIStroke.Color = Color3.fromRGB(255, 80, 80)
-UIStroke.Parent = ToggleBtn
-
--- Hiệu ứng nhấn
-ToggleBtn.MouseButton1Down:Connect(function()
-    ToggleBtn.Size = UDim2.fromOffset(54, 54)
-end)
-
-ToggleBtn.MouseButton1Up:Connect(function()
-    ToggleBtn.Size = UDim2.fromOffset(60, 60)
-end)
-
--- Toggle Fluent UI
-ToggleBtn.MouseButton1Click:Connect(function()
-    pcall(function()
+    ToggleBtn.MouseButton1Click:Connect(function()
         Window:Minimize()
     end)
-end)
-
-local Options = Fluent.Options
+end
+CreateMobileToggle()
 
 -- ================= HELPER FUNCTIONS =================
 
--- Check if player is a valid enemy
 local function IsValidEnemy(plr)
     if not plr or plr == LocalPlayer or not plr.Character then return false end
     local hum = plr.Character:FindFirstChild("Humanoid")
@@ -138,13 +126,12 @@ local function IsValidEnemy(plr)
         return false
     end
     
-    -- ForceField Check (Optional)
+    -- ForceField Check
     if plr.Character:FindFirstChild("ForceField") then return false end
     
     return true
 end
 
--- Get the closest player by Distance (Magnitude)
 local function GetClosestPlayerToChar()
     local closestPlr = nil
     local shortestDist = math.huge
@@ -164,28 +151,14 @@ local function GetClosestPlayerToChar()
     return closestPlr
 end
 
--- Get a specific player object by name
-local function GetPlayerByName(name)
-    for _, v in pairs(Players:GetPlayers()) do
-        if v.Name == name or v.DisplayName == name then
-            return v
-        end
-    end
-    return nil
-end
-
--- Get list of names for Dropdown
 local function GetPlayerNames()
     local names = {}
     for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer then
-            table.insert(names, v.Name)
-        end
+        if v ~= LocalPlayer then table.insert(names, v.Name) end
     end
     return names
 end
 
--- Simulate Mouse Click for Attacking
 local function AttackClick()
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
     task.wait(0.01)
@@ -217,7 +190,7 @@ local PlayerDropdown = AimGroup:AddDropdown("SelectPlayer", {
 
 AimGroup:AddButton({
     Title = "Refresh Player List",
-    Description = "Click to update the list of players",
+    Description = "Update dropdown with current players",
     Callback = function()
         PlayerDropdown:SetValues(GetPlayerNames())
         PlayerDropdown:SetValue(nil)
@@ -234,8 +207,8 @@ AimGroup:AddDropdown("AimPart", {
 
 AimGroup:AddSlider("AimSmooth", {
     Title = "Smoothness",
-    Description = "0 = Instant Lock (Rage), 1 = Slow",
-    Min = 0, Max = 1, Default = 0, Rounding = 1,
+    Description = "0 = Rage, 1 = Legit",
+    Min = 0, Max = 1, Default = 0.1, Rounding = 2,
     Callback = function(v) Config.AimSmooth = v end
 })
 
@@ -243,7 +216,7 @@ AimGroup:AddSlider("AimSmooth", {
 local CombatGroup = Tabs.Combat:AddSection("PVP Enhancements")
 
 CombatGroup:AddToggle("KillAura", {
-    Title = "Kill Aura (Blatant)", 
+    Title = "Kill Aura", 
     Description = "Auto attack enemies in range",
     Default = false, 
     Callback = function(v) Config.KillAura = v end
@@ -257,30 +230,20 @@ CombatGroup:AddSlider("AuraRange", {
 
 CombatGroup:AddToggle("TriggerBot", {
     Title = "TriggerBot", 
-    Description = "Auto shoot when crosshair is on enemy",
+    Description = "Shoots when aiming at enemy",
     Default = false, 
     Callback = function(v) Config.TriggerBot = v end
-})
-
-CombatGroup:AddToggle("Spinbot", {
-    Title = "Spinbot (Anti-Aim)", 
-    Description = "Spins character wildly",
-    Default = false, 
-    Callback = function(v) Config.Spinbot = v end
-})
-
-CombatGroup:AddSlider("SpinSpeed", {
-    Title = "Spin Speed",
-    Min = 10, Max = 100, Default = 50, Rounding = 0,
-    Callback = function(v) Config.SpinSpeed = v end
 })
 
 CombatGroup:AddToggle("Hitbox", {Title = "Hitbox Expander", Default = false, Callback = function(v) Config.Hitbox = v end})
 CombatGroup:AddSlider("HitboxSize", {Title = "Hitbox Size", Min = 2, Max = 30, Default = 10, Rounding = 0, Callback = function(v) Config.HitboxSize = v end})
 
+CombatGroup:AddToggle("Spinbot", {Title = "Spinbot (Anti-Aim)", Default = false, Callback = function(v) Config.Spinbot = v end})
+CombatGroup:AddSlider("SpinSpeed", {Title = "Spin Speed", Min = 10, Max = 100, Default = 50, Rounding = 0, Callback = function(v) Config.SpinSpeed = v end})
+
 -- [[ VISUALS TAB ]]
 local VisualsGroup = Tabs.Visuals:AddSection("ESP Settings")
-VisualsGroup:AddToggle("ESP", {Title = "Enable ESP", Default = false, Callback = function(v) Config.ESP = v end})
+VisualsGroup:AddToggle("ESP", {Title = "Enable ESP (Highlight)", Default = false, Callback = function(v) Config.ESP = v end})
 VisualsGroup:AddToggle("ESPTeam", {Title = "Team Check", Default = true, Callback = function(v) Config.ESPTeamCheck = v end})
 
 -- [[ MOVEMENT TAB ]]
@@ -296,40 +259,30 @@ MoveGroup:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callba
 
 -- ================= LOGIC LOOPS =================
 
--- 1. AIMBOT ENGINE (RenderStepped for Smooth Camera)
+-- AIMBOT ENGINE
 RunService.RenderStepped:Connect(function()
     if Config.Aimbot then
         local target = nil
-        
-        -- MODE 1: Nearest Character
         if Config.AimMode == "Nearest Character" then
             target = GetClosestPlayerToChar()
-            
-        -- MODE 2: Specific Player
         elseif Config.AimMode == "Specific Player" then
-            target = GetPlayerByName(Config.SelectedTarget)
-            -- Validate target
-            if target and not IsValidEnemy(target) then 
-                -- If specific target is dead/invalid, do nothing or find next best?
-                -- For now, we just don't aim if they are dead.
-                target = nil 
+            for _, v in pairs(Players:GetPlayers()) do
+                if v.Name == Config.SelectedTarget then target = v break end
             end
         end
 
-        -- EXECUTE AIM
         if target and target.Character and target.Character:FindFirstChild(Config.AimPart) then
             local targetPos = target.Character[Config.AimPart].Position
             local currentCF = Camera.CFrame
             local goalCF = CFrame.new(currentCF.Position, targetPos)
             
-            -- No FOV check here. It just locks.
             if Config.AimSmooth <= 0.05 then
-                Camera.CFrame = goalCF -- Rage Lock
+                Camera.CFrame = goalCF
             else
                 Camera.CFrame = currentCF:Lerp(goalCF, 1 - Config.AimSmooth)
             end
             
-            -- TriggerBot Logic
+            -- TriggerBot
             if Config.TriggerBot then
                 local mouseTarget = Mouse.Target
                 if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
@@ -340,37 +293,27 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- 2. COMBAT & PHYSICS ENGINE (Heartbeat)
+-- PHYSICS ENGINE
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    
     local hrp = char.HumanoidRootPart
     
-    -- Kill Aura Logic
+    -- Kill Aura
     if Config.KillAura then
         for _, v in pairs(Players:GetPlayers()) do
             if IsValidEnemy(v) then
                 local enemyRoot = v.Character:FindFirstChild("HumanoidRootPart")
-                if enemyRoot then
-                    local dist = (hrp.Position - enemyRoot.Position).Magnitude
-                    if dist <= Config.KillAuraRange then
-                        -- Face Enemy (Silent Aim style for Aura)
-                        hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(enemyRoot.Position.X, hrp.Position.Y, enemyRoot.Position.Z))
-                        -- Attack
-                        AttackClick()
-                    end
+                if enemyRoot and (hrp.Position - enemyRoot.Position).Magnitude <= Config.KillAuraRange then
+                    -- Face Enemy for better hit registration
+                    hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(enemyRoot.Position.X, hrp.Position.Y, enemyRoot.Position.Z))
+                    AttackClick()
                 end
             end
         end
     end
     
-    -- Spinbot Logic
-    if Config.Spinbot then
-        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed), 0)
-    end
-    
-    -- Hitbox Expander
+    -- Hitbox
     if Config.Hitbox then
         for _, v in pairs(Players:GetPlayers()) do
             if IsValidEnemy(v) then
@@ -379,41 +322,42 @@ RunService.Heartbeat:Connect(function()
                     eHrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
                     eHrp.Transparency = 0.6
                     eHrp.CanCollide = false
-                    eHrp.Material = Enum.Material.Neon
                     eHrp.Color = Color3.fromRGB(255, 0, 0)
                 end
             end
         end
     else
-        -- Reset Hitbox (Optional, simple reset)
+        -- Reset Hitbox
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
                 local eHrp = v.Character.HumanoidRootPart
-                if eHrp.Size.X == Config.HitboxSize then -- Check if we modified it
-                     eHrp.Size = Vector3.new(2, 2, 1) -- Default Size
+                if eHrp.Size.X == Config.HitboxSize then
+                     eHrp.Size = Vector3.new(2, 2, 1)
                      eHrp.Transparency = 1
                 end
             end
         end
     end
     
-    -- Fly Logic
+    -- Spinbot
+    if Config.Spinbot then
+        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed), 0)
+    end
+    
+    -- Fly
     if Config.Fly then
         local bv = hrp:FindFirstChild("DinoFly") or Instance.new("BodyVelocity")
         bv.Name = "DinoFly"
         bv.Parent = hrp
         bv.MaxForce = Vector3.new(100000, 100000, 100000)
-        
         local camCF = Camera.CFrame
         local velocity = Vector3.new()
-        
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then velocity = velocity + camCF.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then velocity = velocity - camCF.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then velocity = velocity - camCF.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then velocity = velocity + camCF.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then velocity = velocity + Vector3.new(0, 1, 0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then velocity = velocity - Vector3.new(0, 1, 0) end
-        
         bv.Velocity = velocity * Config.FlySpeed
     else
         local bv = hrp:FindFirstChild("DinoFly")
@@ -427,7 +371,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
     
-    -- WalkSpeed & JumpPower
+    -- Speed/Jump
     local hum = char:FindFirstChild("Humanoid")
     if hum then
         if Config.WalkSpeed > 16 then hum.WalkSpeed = Config.WalkSpeed end
@@ -435,42 +379,36 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- 3. VISUALS ENGINE
+-- VISUALS ENGINE
 task.spawn(function()
     while true do
         task.wait(1)
         if Config.ESP then
             for _, v in pairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character then
-                    if IsValidEnemy(v) then
-                        if not v.Character:FindFirstChild("DinoESP") then
-                            local hl = Instance.new("Highlight")
-                            hl.Name = "DinoESP"
-                            hl.FillColor = Color3.fromRGB(255, 50, 50)
-                            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                            hl.FillTransparency = 0.5
-                            hl.OutlineTransparency = 0
-                            hl.Parent = v.Character
-                        end
-                    else
-                        local hl = v.Character:FindFirstChild("DinoESP")
-                        if hl then hl:Destroy() end
+                if v ~= LocalPlayer and v.Character and IsValidEnemy(v) then
+                    if not v.Character:FindFirstChild("DinoESP") then
+                        local hl = Instance.new("Highlight")
+                        hl.Name = "DinoESP"
+                        hl.FillColor = Color3.fromRGB(255, 0, 0)
+                        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        hl.FillTransparency = 0.5
+                        hl.Parent = v.Character
                     end
+                elseif v.Character and v.Character:FindFirstChild("DinoESP") then
+                    v.Character.DinoESP:Destroy()
                 end
             end
         else
-            -- Cleanup
             for _, v in pairs(Players:GetPlayers()) do
-                if v.Character then
-                    local hl = v.Character:FindFirstChild("DinoESP")
-                    if hl then hl:Destroy() end
+                if v.Character and v.Character:FindFirstChild("DinoESP") then
+                    v.Character.DinoESP:Destroy()
                 end
             end
         end
     end
 end)
 
--- Infinite Jump Hook
+-- INF JUMP
 UserInputService.JumpRequest:Connect(function()
     if Config.InfJump and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -482,13 +420,13 @@ end)
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetFolder("DinoPVP")
+SaveManager:SetFolder("DinoPVP_V2")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 
 Window:SelectTab(1)
 
 Fluent:Notify({
-    Title = "DinoPVP Loaded",
-    Content = "Script Upgraded. Aimbot & PVP Ready.",
+    Title = "DinoPVP V2 Loaded",
+    Content = "Script upgraded successfully!",
     Duration = 5
 })
