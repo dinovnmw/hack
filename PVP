@@ -1,9 +1,3 @@
---[[ 
-    DINO PVP V3 ULTIMATE - SUPER ANTIBAN & DODGE EDITION
-    Library: Fluent (Modern, Dark, Smooth)
-    Language: Lua
-    Target: Roblox Executors (Synapse, Krnl, Fluxus, Delta, Hydrogen, etc.)
-]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
@@ -64,8 +58,8 @@ local Config = {
 
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP V3 Ultimate",
-    SubTitle = "Antiban & Dodge Added",
+    Title = "DinoPVP ",
+    SubTitle = "Script bá sàn Việt Nam",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -103,7 +97,7 @@ local function CreateMobileToggle()
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     ToggleBtn.BackgroundTransparency = 0.2
     ToggleBtn.BorderSizePixel = 0
-    ToggleBtn.Image = "rbxassetid://13350795660" -- Fluent Icon
+    ToggleBtn.Image = "rbxassetid://101234229009442" -- Fluent Icon
     ToggleBtn.Active = true
     ToggleBtn.Draggable = true
 
@@ -276,7 +270,7 @@ SecurityGroup:AddToggle("AntiAFK", {
 
 SecurityGroup:AddToggle("AntiDetect", {
     Title = "Safe Mode (Anti-Detect)",
-    Description = "Spoofs WalkSpeed in properties (Bypass simple Anti-Cheats)",
+    Description = "Spoofs WalkSpeed in properties",
     Default = false,
     Callback = function(v) Config.AntiDetect = v end
 })
@@ -344,18 +338,18 @@ RunService.RenderStepped:Connect(function()
             local targetPos = target.Character[Config.AimPart].Position
             local currentCF = Camera.CFrame
             
-            -- Tính toán CFrame hướng về mục tiêu
+            -- Calculate look CFrame
             local goalCF = CFrame.new(currentCF.Position, targetPos)
             local lerpAlpha = 1 - Config.AimSmooth
 
-            -- 1. Xoay Camera
+            -- 1. Rotate Camera
             if Config.AimSmooth <= 0.05 then
                 Camera.CFrame = goalCF
             else
                 Camera.CFrame = currentCF:Lerp(goalCF, lerpAlpha)
             end
 
-            -- 2. Xoay Character (Chỉ xoay trục Y để tránh nhân vật bị nghiêng chúi xuống đất)
+            -- 2. Rotate Character (Only Y axis)
             local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
             local characterGoalCF = CFrame.new(rootPart.Position, lookAtPos)
 
@@ -375,6 +369,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+
 -- PHYSICS ENGINE
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
