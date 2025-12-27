@@ -1,3 +1,8 @@
+--[[
+    DinoPVP V3 - Ultimate Script
+    Library: Fluent (Modern & Smooth)
+    Features: Aimbot (Model Rotation Fix), Super Antiban, Kill Aura, Hitbox, ESP, Fly
+]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
@@ -18,13 +23,14 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 -- ================= CONFIGURATION =================
+local Options = Fluent.Options
 local Config = {
     -- Aimbot
     Aimbot = false,
     AimMode = "Nearest Character",
-    SelectedTarget = "",
     AimPart = "Head",
     AimSmooth = 0.1,
+    RotateCharacter = true, -- The requested fix
     
     -- Combat
     KillAura = false,
@@ -34,9 +40,9 @@ local Config = {
     HitboxSize = 10,
     Spinbot = false,
     SpinSpeed = 50,
-    Dodge = false,        -- NEW
-    DodgeSpeed = 5,       -- NEW
-    DodgePower = 2,       -- NEW
+    Dodge = false,
+    DodgeSpeed = 5,
+    DodgePower = 2,
     
     -- Visuals
     ESP = false,
@@ -50,16 +56,15 @@ local Config = {
     Noclip = false,
     InfJump = false,
 
-    -- Security (New)
+    -- Security
     AntiKick = false,
-    AntiAFK = true,
-    AntiDetect = false -- Basic Speed Spoof
+    AntiAFK = true
 }
 
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP ",
-    SubTitle = " BETA---Cẩn thận ban đợi update",
+    Title = "DinoPVP V3",
+    SubTitle = "by DinoDev",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -72,49 +77,9 @@ local Tabs = {
     Combat = Window:AddTab({ Title = "Combat", Icon = "swords" }),
     Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
     Movement = Window:AddTab({ Title = "Movement", Icon = "move" }),
-    Security = Window:AddTab({ Title = "Security", Icon = "shield" }), -- NEW TAB
+    Security = Window:AddTab({ Title = "Security", Icon = "shield" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
-
--- ================= MOBILE UI TOGGLE ICON =================
--- Adds a button to open/close menu on mobile
-local function CreateMobileToggle()
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    if PlayerGui:FindFirstChild("DinoMobileToggle") then return end
-
-    local ToggleGui = Instance.new("ScreenGui")
-    ToggleGui.Name = "DinoMobileToggle"
-    ToggleGui.IgnoreGuiInset = true
-    ToggleGui.ResetOnSpawn = false
-    ToggleGui.DisplayOrder = 999999
-    ToggleGui.Parent = PlayerGui
-
-    local ToggleBtn = Instance.new("ImageButton")
-    ToggleBtn.Name = "ToggleButton"
-    ToggleBtn.Parent = ToggleGui
-    ToggleBtn.Size = UDim2.fromOffset(50, 50)
-    ToggleBtn.Position = UDim2.new(0, 20, 0.4, 0)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    ToggleBtn.BackgroundTransparency = 0.2
-    ToggleBtn.BorderSizePixel = 0
-    ToggleBtn.Image = "rbxassetid://101234229009442" -- Fluent Icon
-    ToggleBtn.Active = true
-    ToggleBtn.Draggable = true
-
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(1, 0)
-    UICorner.Parent = ToggleBtn
-    
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Color = Color3.fromRGB(100, 100, 255)
-    UIStroke.Thickness = 2
-    UIStroke.Parent = ToggleBtn
-
-    ToggleBtn.MouseButton1Click:Connect(function()
-        Window:Minimize()
-    end)
-end
-CreateMobileToggle()
 
 -- ================= HELPER FUNCTIONS =================
 
@@ -153,16 +118,7 @@ local function GetClosestPlayerToChar()
     return closestPlr
 end
 
-local function GetPlayerNames()
-    local names = {}
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer then table.insert(names, v.Name) end
-    end
-    return names
-end
-
 local function AttackClick()
-    -- Simulates a left mouse click
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
     task.wait(0.01)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
@@ -175,37 +131,19 @@ local AimGroup = Tabs.Aimbot:AddSection("Targeting System")
 
 AimGroup:AddToggle("AimbotToggle", {Title = "Enable Aimbot", Default = false, Callback = function(v) Config.Aimbot = v end})
 
-AimGroup:AddDropdown("AimMode", {
-    Title = "Aim Mode",
-    Values = {"Nearest Character", "Specific Player"},
-    Multi = false,
-    Default = "Nearest Character",
-    Callback = function(v) Config.AimMode = v end
-})
-
-local PlayerDropdown = AimGroup:AddDropdown("SelectPlayer", {
-    Title = "Select Specific Player",
-    Values = GetPlayerNames(),
-    Multi = false,
-    Default = 1,
-    Callback = function(v) Config.SelectedTarget = v end
-})
-
-AimGroup:AddButton({
-    Title = "Refresh Player List",
-    Description = "Update dropdown with current players",
-    Callback = function()
-        PlayerDropdown:SetValues(GetPlayerNames())
-        PlayerDropdown:SetValue(nil)
-    end
-})
-
 AimGroup:AddDropdown("AimPart", {
     Title = "Aim Part",
     Values = {"Head", "HumanoidRootPart", "Torso"},
     Default = "Head",
     Multi = false,
     Callback = function(v) Config.AimPart = v end
+})
+
+AimGroup:AddToggle("RotateChar", {
+    Title = "Rotate Character", 
+    Description = "Fixes aimbot by rotating your model to face target",
+    Default = true, 
+    Callback = function(v) Config.RotateCharacter = v end
 })
 
 AimGroup:AddSlider("AimSmooth", {
@@ -223,14 +161,11 @@ CombatGroup:AddSlider("AuraRange", {Title = "Kill Aura Range", Min = 5, Max = 50
 CombatGroup:AddToggle("TriggerBot", {Title = "TriggerBot", Description = "Shoots when aiming at enemy", Default = false, Callback = function(v) Config.TriggerBot = v end})
 CombatGroup:AddToggle("Hitbox", {Title = "Hitbox Expander", Default = false, Callback = function(v) Config.Hitbox = v end})
 CombatGroup:AddSlider("HitboxSize", {Title = "Hitbox Size", Min = 2, Max = 30, Default = 10, Rounding = 0, Callback = function(v) Config.HitboxSize = v end})
-CombatGroup:AddToggle("Spinbot", {Title = "Spinbot (Anti-Aim)", Default = false, Callback = function(v) Config.Spinbot = v end})
-CombatGroup:AddSlider("SpinSpeed", {Title = "Spin Speed", Min = 10, Max = 100, Default = 50, Rounding = 0, Callback = function(v) Config.SpinSpeed = v end})
 
--- New Dodge Section
-local DodgeGroup = Tabs.Combat:AddSection("Dodge System")
-DodgeGroup:AddToggle("Dodge", {Title = "Enable Dodge (Auto Strafe)", Default = false, Callback = function(v) Config.Dodge = v end})
-DodgeGroup:AddSlider("DodgeSpeed", {Title = "Dodge Speed", Min = 1, Max = 20, Default = 5, Rounding = 1, Callback = function(v) Config.DodgeSpeed = v end})
-DodgeGroup:AddSlider("DodgePower", {Title = "Dodge Distance", Min = 1, Max = 10, Default = 2, Rounding = 1, Callback = function(v) Config.DodgePower = v end})
+local AntiAimGroup = Tabs.Combat:AddSection("Anti-Aim / Dodge")
+AntiAimGroup:AddToggle("Spinbot", {Title = "Spinbot", Default = false, Callback = function(v) Config.Spinbot = v end})
+AntiAimGroup:AddSlider("SpinSpeed", {Title = "Spin Speed", Min = 10, Max = 100, Default = 50, Rounding = 0, Callback = function(v) Config.SpinSpeed = v end})
+AntiAimGroup:AddToggle("Dodge", {Title = "Auto Dodge (Strafe)", Default = false, Callback = function(v) Config.Dodge = v end})
 
 -- [[ VISUALS TAB ]]
 local VisualsGroup = Tabs.Visuals:AddSection("ESP Settings")
@@ -247,32 +182,23 @@ MoveGroup:AddToggle("Noclip", {Title = "Noclip", Default = false, Callback = fun
 MoveGroup:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callback = function(v) Config.InfJump = v end})
 
 -- [[ SECURITY TAB ]]
-local SecurityGroup = Tabs.Security:AddSection("Protection Suite")
+local SecurityGroup = Tabs.Security:AddSection("Super Antiban")
 
 SecurityGroup:AddToggle("AntiKick", {
     Title = "Anti-Kick (Client)",
-    Description = "Prevents client-sided kick attempts (Requires hookmetamethod)",
+    Description = "Prevents local scripts from kicking you",
     Default = false,
     Callback = function(v) 
         Config.AntiKick = v 
-        if v then
-            Fluent:Notify({Title = "Security", Content = "Anti-Kick Enabled. Local scripts cannot kick you.", Duration = 3})
-        end
+        if v then Fluent:Notify({Title = "Security", Content = "Anti-Kick Active", Duration = 3}) end
     end
 })
 
 SecurityGroup:AddToggle("AntiAFK", {
     Title = "Anti-AFK",
-    Description = "Prevents 20 min idle disconnect",
+    Description = "Prevents idle disconnect",
     Default = true,
     Callback = function(v) Config.AntiAFK = v end
-})
-
-SecurityGroup:AddToggle("AntiDetect", {
-    Title = "Safe Mode (Anti-Detect)",
-    Description = "Spoofs WalkSpeed in properties",
-    Default = false,
-    Callback = function(v) Config.AntiDetect = v end
 })
 
 SecurityGroup:AddButton({
@@ -285,32 +211,30 @@ SecurityGroup:AddButton({
         Config.WalkSpeed = 16
         Config.JumpPower = 50
         Config.ESP = false
-        Window:Dialog({
-            Title = "Panic Mode",
-            Content = "All features have been disabled.",
-            Buttons = {{ Title = "OK" }}
-        })
+        Window:Dialog({Title = "Panic Mode", Content = "All features disabled.", Buttons = {{ Title = "OK" }}})
     end
 })
 
 -- ================= LOGIC LOOPS =================
 
--- ANTI-KICK IMPLEMENTATION
+-- ANTI-KICK IMPLEMENTATION (Super Antiban)
 local OldNameCall = nil
 pcall(function()
-    OldNameCall = hookmetamethod(game, "__namecall", function(Self, ...)
-        local Args = {...}
-        local Method = getnamecallmethod()
-        
-        if Config.AntiKick and Self == LocalPlayer and (Method == "Kick" or Method == "kick") then
-            return nil -- Block the kick
-        end
-        
-        return OldNameCall(Self, unpack(Args))
-    end)
+    if getnamecallmethod and hookmetamethod then
+        OldNameCall = hookmetamethod(game, "__namecall", function(Self, ...)
+            local Args = {...}
+            local Method = getnamecallmethod()
+            
+            if Config.AntiKick and Self == LocalPlayer and (Method == "Kick" or Method == "kick") then
+                return nil -- Block the kick
+            end
+            
+            return OldNameCall(Self, unpack(Args))
+        end)
+    end
 end)
 
--- ANTI-AFK IMPLEMENTATION
+-- ANTI-AFK
 LocalPlayer.Idled:Connect(function()
     if Config.AntiAFK then
         VirtualUser:CaptureController()
@@ -321,24 +245,14 @@ end)
 -- AIMBOT ENGINE
 RunService.RenderStepped:Connect(function()
     if Config.Aimbot then
-        local target = nil
-        if Config.AimMode == "Nearest Character" then
-            target = GetClosestPlayerToChar()
-        elseif Config.AimMode == "Specific Player" then
-            for _, v in pairs(Players:GetPlayers()) do
-                if v.Name == Config.SelectedTarget then target = v break end
-            end
-        end
+        local target = GetClosestPlayerToChar()
 
-        local localPlayer = Players.LocalPlayer
-        if target and target.Character and target.Character:FindFirstChild(Config.AimPart) and localPlayer.Character then
-            local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if target and target.Character and target.Character:FindFirstChild(Config.AimPart) and LocalPlayer.Character then
+            local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if not rootPart then return end
 
             local targetPos = target.Character[Config.AimPart].Position
             local currentCF = Camera.CFrame
-            
-            -- Calculate look CFrame
             local goalCF = CFrame.new(currentCF.Position, targetPos)
             local lerpAlpha = 1 - Config.AimSmooth
 
@@ -349,14 +263,15 @@ RunService.RenderStepped:Connect(function()
                 Camera.CFrame = currentCF:Lerp(goalCF, lerpAlpha)
             end
 
-            -- 2. Rotate Character (Only Y axis)
-            local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
-            local characterGoalCF = CFrame.new(rootPart.Position, lookAtPos)
-
-            if Config.AimSmooth <= 0.05 then
-                rootPart.CFrame = characterGoalCF
-            else
-                rootPart.CFrame = rootPart.CFrame:Lerp(characterGoalCF, lerpAlpha)
+            -- 2. Rotate Character (FIX: Changes model angle)
+            if Config.RotateCharacter then
+                local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
+                local characterGoalCF = CFrame.new(rootPart.Position, lookAtPos)
+                if Config.AimSmooth <= 0.05 then
+                    rootPart.CFrame = characterGoalCF
+                else
+                    rootPart.CFrame = rootPart.CFrame:Lerp(characterGoalCF, lerpAlpha)
+                end
             end
             
             -- TriggerBot
@@ -370,7 +285,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- PHYSICS ENGINE
+-- PHYSICS ENGINE (Combat & Movement)
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -383,7 +298,6 @@ RunService.Heartbeat:Connect(function()
             if IsValidEnemy(v) then
                 local enemyRoot = v.Character:FindFirstChild("HumanoidRootPart")
                 if enemyRoot and (hrp.Position - enemyRoot.Position).Magnitude <= Config.KillAuraRange then
-                    -- Face the enemy instantly
                     hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(enemyRoot.Position.X, hrp.Position.Y, enemyRoot.Position.Z))
                     AttackClick()
                 end
@@ -405,7 +319,6 @@ RunService.Heartbeat:Connect(function()
             end
         end
     else
-        -- Reset sizes if disabled
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
                 local eHrp = v.Character.HumanoidRootPart
@@ -422,9 +335,8 @@ RunService.Heartbeat:Connect(function()
         hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed), 0)
     end
     
-    -- Dodge (Strafe)
+    -- Dodge
     if Config.Dodge then
-        -- Uses a sine wave to move left and right rapidly
         local currentTime = tick()
         local strafeOffset = math.sin(currentTime * Config.DodgeSpeed) * Config.DodgePower
         hrp.CFrame = hrp.CFrame * CFrame.new(strafeOffset, 0, 0)
@@ -459,18 +371,10 @@ RunService.Heartbeat:Connect(function()
         end
     end
     
-    -- Speed/Jump & AntiDetect Spoofing
+    -- Speed/Jump
     if hum then
-        if Config.AntiDetect then
-            -- Bypass: Set WalkSpeed but try to mask it (very basic, game dependent)
-            local oldWS = hum.WalkSpeed
-            if Config.WalkSpeed > 16 then
-                hum.WalkSpeed = Config.WalkSpeed
-            end
-        else
-            if Config.WalkSpeed > 16 then hum.WalkSpeed = Config.WalkSpeed end
-            if Config.JumpPower > 50 then hum.JumpPower = Config.JumpPower end
-        end
+        if Config.WalkSpeed > 16 then hum.WalkSpeed = Config.WalkSpeed end
+        if Config.JumpPower > 50 then hum.JumpPower = Config.JumpPower end
     end
 end)
 
@@ -515,13 +419,8 @@ end)
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetFolder("DinoPVP_V3_Ult")
+SaveManager:SetFolder("DinoPVP_V3")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 
 Window:SelectTab(1)
-
-Fluent:Notify({
-    Title = "DinoPVP",
-    Content = "BETA",
-    Duration = 5
-})
+Fluent:Notify({Title = "DinoPVP V3", Content = "Script Loaded Successfully", Duration = 5})
