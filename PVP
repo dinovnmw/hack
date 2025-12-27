@@ -59,7 +59,7 @@ local Config = {
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
     Title = "DinoPVP ",
-    SubTitle = "Script bá sàn Việt Nam",
+    SubTitle = " BETA---Script bá sàn Việt Nam",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -521,7 +521,7 @@ InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 Window:SelectTab(1)
 
 Fluent:Notify({
-    Title = "DinoPVP V3 Ultimate",
-    Content = "Super Antiban & Dodge Activated!",
+    Title = "DinoPVP",
+    Content = "BETA",
     Duration = 5
 })
