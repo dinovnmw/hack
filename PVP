@@ -59,7 +59,7 @@ local Config = {
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
     Title = "DinoPVP ",
-    SubTitle = " BETA---Script bá sàn Việt Nam",
+    SubTitle = " BETA---Cẩn thận ban đợi update",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
