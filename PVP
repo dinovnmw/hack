@@ -90,8 +90,8 @@ local Config = {
 
 -- ================= UI SETUP =================
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP V4",
-    SubTitle = "by DinoDev (Upgraded)",
+    Title = "DinoPVP ",
+    SubTitle = "by DinoDev (BetaBeta)",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -812,4 +812,4 @@ SaveManager:IgnoreThemeSettings()
 SaveManager:SetFolder("DinoPVP_V4")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 Window:SelectTab(1)
-Fluent:Notify({Title = "DinoPVP V4", Content = "Upgraded Script Loaded Successfully", Duration = 5})
+Fluent:Notify({Title = "DinoPVP ", Content = "Upgraded Script Loaded Successfully", Duration = 5})
