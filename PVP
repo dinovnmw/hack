@@ -561,6 +561,7 @@ LocalPlayer.Idled:Connect(function()
 end)
 
 -- AIMBOT ENGINE (Fixed)
+
 RunService.RenderStepped:Connect(function(delta)
     if not Config.Aimbot or not LocalPlayer.Character then return end
     
@@ -571,44 +572,31 @@ RunService.RenderStepped:Connect(function(delta)
     if not target or not target.Character or not target.Character:FindFirstChild(Config.AimPart) then return end
     
     local aimPart = target.Character[Config.AimPart]
-    if not aimPart then return end
     
-    -- Improved prediction
-    local predictedPos = aimPart.Position
+    local targetPos = aimPart.Position
+    
+    -- Prediction (nếu bật)
     if Config.AimPrediction then
         local velocity = aimPart.AssemblyLinearVelocity or Vector3.new()
-        local dist = (Camera.CFrame.Position - aimPart.Position).Magnitude
-        local projectileSpeed = 200 -- adjust based on game (e.g. bullet speed)
+        local dist = (Camera.CFrame.Position - targetPos).Magnitude
+        local projectileSpeed = 150 -- điều chỉnh theo game
         local time = dist / projectileSpeed
-        predictedPos = predictedPos + velocity * time
-    end
-    
-    -- Wall check
-    if Config.AimWallCheck then
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-        
-        local rayResult = Workspace:Raycast(Camera.CFrame.Position, (predictedPos - Camera.CFrame.Position), rayParams)
-        if rayResult and not rayResult.Instance:IsDescendantOf(target.Character) then
-            return -- blocked by wall
-        end
+        targetPos = targetPos + velocity * time
     end
     
     local currentCF = Camera.CFrame
-    local goalCF = CFrame.new(currentCF.Position, predictedPos)
+    local goalCF = CFrame.new(currentCF.Position, targetPos)
     
-    local alpha = Config.AimSmooth == 0 and 1 or math.min(1 - Config.AimSmooth, 1)
-    alpha = math.clamp(alpha, 0.01, 1)
+    local alpha = math.clamp(1 - Config.AimSmooth, 0.01, 1)
     
-    -- Smooth camera aim
+    -- Camera aim
     Camera.CFrame = currentCF:Lerp(goalCF, alpha)
     
-    -- Character rotation fix (only if enabled)
+    -- Character rotation (giữ Y, mượt hơn)
     if Config.RotateCharacter then
-        local lookAt = Vector3.new(predictedPos.X, rootPart.Position.Y, predictedPos.Z)
+        local lookAt = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
         local targetCFrame = CFrame.new(rootPart.Position, lookAt)
-        rootPart.CFrame = rootPart.CFrame:Lerp(targetCFrame, alpha * 1.5) -- slightly faster rotation
+        rootPart.CFrame = rootPart.CFrame:Lerp(targetCFrame, alpha * 1.2)
     end
     
     -- TriggerBot
