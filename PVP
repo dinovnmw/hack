@@ -1,3 +1,4 @@
+
 --[[
     DinoPVP V4 - Ultimate Script (Upgraded)
     Library: Fluent (Modern & Smooth)
@@ -110,42 +111,48 @@ local Tabs = {
 }
 
 -- ================= HELPER FUNCTIONS =================
+-- Helper: Check if player is valid enemy (Old)
 local function IsValidEnemy(plr)
-    if not plr or plr == LocalPlayer or not plr.Character then return false end
-    local hum = plr.Character:FindFirstChild("Humanoid")
-    local root = plr.Character:FindFirstChild("HumanoidRootPart")
- 
-    if not hum or not root or hum.Health <= 0 then return false end
- 
-    if Config.ESPTeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-        return false
-    end
- 
-    if plr.Character:FindFirstChild("ForceField") then return false end
- 
-    return true
+    if not plr or plr == LocalPlayer or not plr.Character then return false end
+    local hum = plr.Character:FindFirstChild("Humanoid")
+    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not hum or not root or hum.Health <= 0 then return false end
+    
+    if Config.ESPTeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+        return false
+    end
+    
+    if plr.Character:FindFirstChild("ForceField") then return false end
+    
+    return true
 end
+
+-- Helper: Get closest player (Old + FOV Check New)
 local function GetClosestPlayerToChar()
-    local closestPlr = nil
-    local shortestDist = math.huge
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
- 
-    if not myRoot then return nil end
-    for _, v in pairs(Players:GetPlayers()) do
-        if IsValidEnemy(v) then
-            local dist = (myRoot.Position - v.Character.HumanoidRootPart.Position).Magnitude
-            if dist < shortestDist then
-                closestPlr = v
-                shortestDist = dist
-            end
-        end
-    end
-    return closestPlr
-end
-local function AttackClick()
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-    task.wait(0.01)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    local closestPlr = nil
+    local shortestDist = math.huge
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not myRoot then return nil end
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if IsValidEnemy(v) then
+            local targetRoot = v.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                local dist = (myRoot.Position - targetRoot.Position).Magnitude
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetRoot.Position)
+                local mousePos = Vector2.new(Mouse.X, Mouse.Y)
+                local angle = math.deg(math.acos((Vector2.new(screenPos.X, screenPos.Y) - mousePos).Unit.Dot(Vector2.new(0,0))))
+                
+                if onScreen and angle <= Config.AimFOV / 2 and dist < shortestDist then
+                    closestPlr = v
+                    shortestDist = dist
+                end
+            end
+        end
+    end
+    return closestPlr
 end
 
 -- Helper: Predict position (New for Aimbot)
@@ -554,32 +561,27 @@ LocalPlayer.Idled:Connect(function()
 end)
 
 -- AIMBOT ENGINE (Fixed)
-RunService.RenderStepped:Connect(function()
-    if Config.Aimbot then
-        local target = GetClosestPlayerToChar()
-        if target and target.Character and target.Character:FindFirstChild(Config.AimPart) and LocalPlayer.Character then
-            local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then return end
-            local targetPos = target.Character[Config.AimPart].Position
-            local currentCF = Camera.CFrame
-            local goalCF = CFrame.new(currentCF.Position, targetPos)
-            local lerpAlpha = 1 - Config.AimSmooth
-            -- 1. Rotate Camera
-            if Config.AimSmooth <= 0.05 then
-                Camera.CFrame = goalCF
-            else
-                Camera.CFrame = currentCF:Lerp(goalCF, lerpAlpha)
-            end
-            -- 2. Rotate Character (FIX: Changes model angle)
-            if Config.RotateCharacter then
-                local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
-                local characterGoalCF = CFrame.new(rootPart.Position, lookAtPos)
-                if Config.AimSmooth <= 0.05 then
-                    rootPart.CFrame = characterGoalCF
-                else
-                    rootPart.CFrame = rootPart.CFrame:Lerp(characterGoalCF, lerpAlpha)
-                end
-            end
+RunService.RenderStepped:Connect(function(delta)
+    if not Config.Aimbot or not LocalPlayer.Character then return end
+    
+    local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local target = GetClosestPlayerToChar()
+    if not target or not target.Character or not target.Character:FindFirstChild(Config.AimPart) then return end
+    
+    local aimPart = target.Character[Config.AimPart]
+    if not aimPart then return end
+    
+    -- Improved prediction
+    local predictedPos = aimPart.Position
+    if Config.AimPrediction then
+        local velocity = aimPart.AssemblyLinearVelocity or Vector3.new()
+        local dist = (Camera.CFrame.Position - aimPart.Position).Magnitude
+        local projectileSpeed = 200 -- adjust based on game (e.g. bullet speed)
+        local time = dist / projectileSpeed
+        predictedPos = predictedPos + velocity * time
+    end
     
     -- Wall check
     if Config.AimWallCheck then
@@ -611,13 +613,11 @@ RunService.RenderStepped:Connect(function()
     
     -- TriggerBot
     if Config.TriggerBot then
-                local mouseTarget = Mouse.Target
-                if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
-                    AttackClick()
-                end
-            end
-        end
-    end
+        local mouseTarget = Mouse.Target
+        if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
+            AttackClick()
+        end
+    end
 end)
 
 -- PHYSICS ENGINE (Combat & Movement) (Old + New)
