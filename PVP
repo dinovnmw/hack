@@ -310,58 +310,74 @@ LocalPlayer.Idled:Connect(function()
         VirtualUser:ClickButton2(Vector2.new())
     end
 end)
--- AIMBOT ENGINE (Keeps original logic, adds options)
+-- Replace the AIMBOT ENGINE (RunService.RenderStepped) with this fixed version
+
 RunService.RenderStepped:Connect(function()
-    if Config.Aimbot then
-        local target = Config.FOVAim and GetClosestPlayerInFOV() or GetClosestPlayerToChar()
-        if target and target.Character and target.Character:FindFirstChild(Config.AimPart) and LocalPlayer.Character then
-            local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then return end
-            local targetPos = target.Character[Config.AimPart].Position
-            if Config.Prediction then
-                targetPos = targetPos + (target.Character[Config.AimPart].Velocity * Config.PredictionAmount)
-            end
-            local currentCF = Camera.CFrame
-            local goalCF = CFrame.new(currentCF.Position, targetPos)
-            local lerpAlpha = 1 - Config.AimSmooth
-            -- Original Camera Rotate
-            if Config.AimSmooth <= 0.05 then
-                Camera.CFrame = goalCF
-            else
-                Camera.CFrame = currentCF:Lerp(goalCF, lerpAlpha)
-            end
-            -- Original Character Rotate
-            if Config.RotateCharacter then
-                local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
-                local characterGoalCF = CFrame.new(rootPart.Position, lookAtPos)
-                if Config.AimSmooth <= 0.05 then
-                    rootPart.CFrame = characterGoalCF
-                else
-                    rootPart.CFrame = rootPart.CFrame:Lerp(characterGoalCF, lerpAlpha)
-                end
-            end
-            -- Sticky Aim New (reduces smooth for stickiness)
-            if Config.StickyAim then
-                Config.AimSmooth = math.max(0, Config.AimSmooth - 0.05)
-            end
-            -- Silent Aim New (manipulate raycast if game uses)
-            if Config.SilentAim then
-                -- Assume game has remote for shoot, hook it if possible
-                -- Placeholder: adjust mouse hit
-                Mouse.Hit = CFrame.new(targetPos)
-            end
-          
-            -- TriggerBot
-            if Config.TriggerBot then
-                local mouseTarget = Mouse.Target
-                if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
-                    AttackClick()
-                end
-            end
+    if not Config.Aimbot then return end
+    
+    local target = nil
+    if Config.FOVAim then
+        target = GetClosestPlayerInFOV()
+    else
+        target = GetClosestPlayerToChar()
+    end
+    
+    if not target or not target.Character or not target.Character:FindFirstChild(Config.AimPart) or not LocalPlayer.Character then return end
+    
+    local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local targetPart = target.Character[Config.AimPart]
+    local targetPos = targetPart.Position
+    
+    if Config.Prediction then
+        targetPos = targetPos + (targetPart.Velocity * Config.PredictionAmount)
+    end
+    
+    -- Wall Check (skip if not visible through wall)
+    if Config.WallCheck then
+        local rayOrigin = Camera.CFrame.Position
+        local rayDirection = (targetPos - rayOrigin).Unit * 5000
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        raycastParams.IgnoreWater = true
+        
+        local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+        if not result or not result.Instance:IsDescendantOf(target.Character) then
+            return -- Target behind wall → skip
         end
     end
-    -- Update FOV position
-    fovCircle.Position = UserInputService:GetMouseLocation()
+    
+    local currentCF = Camera.CFrame
+    local goalCF = CFrame.new(currentCF.Position, targetPos)
+    local lerpAlpha = 1 - Config.AimSmooth
+    
+    -- Camera aim
+    if Config.AimSmooth <= 0.05 then
+        Camera.CFrame = goalCF
+    else
+        Camera.CFrame = currentCF:Lerp(goalCF, lerpAlpha)
+    end
+    
+    -- Character rotation (original logic)
+    if Config.RotateCharacter then
+        local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
+        local charGoalCF = CFrame.new(rootPart.Position, lookAtPos)
+        if Config.AimSmooth <= 0.05 then
+            rootPart.CFrame = charGoalCF
+        else
+            rootPart.CFrame = rootPart.CFrame:Lerp(charGoalCF, lerpAlpha)
+        end
+    end
+    
+    -- TriggerBot (fixed: check if mouse is over enemy part)
+    if Config.TriggerBot then
+        local mouseTarget = Mouse.Target
+        if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
+            AttackClick()
+        end
+    end
 end)
 -- PHYSICS ENGINE
 RunService.Heartbeat:Connect(function()
