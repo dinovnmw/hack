@@ -1,70 +1,85 @@
 --[[
-    DinoPVP V4 - Ultimate Script Enhanced
-    Library: Fluent (Modern & Smooth)
-    Features: Original + Wallcheck Aimbot, Sticky Aim, FOV Aim, Enhanced ESP, Tracers, Boxes, Health Bars, Silent Aim, Bhop, No Recoil, Infinite Ammo, God Mode, Teleport, Player List, Jitter Anti-Aim, Fake Lag, Auto Farm (if applicable), More UI Options
-    Keeps original aimbot logic as default, adds toggles for new features
+    DINO PVP V4 - ULTIMATE UPGRADE
+    Author: DinoDev 
+    Library: Fluent (Modern UI)
+    Language: Vietnamese
+    
+    HƯỚNG DẪN SỬ DỤNG:
+    1. Copy toàn bộ code bên dưới.
+    2. Dán vào Executor (Delta, Fluxus, Hydrogen, Solara, Arceus X...).
+    3. Nhấn Execute.
+    4. Menu bật/tắt bằng phím Right Control (Ctrl Phải).
+
+    TÍNH NĂNG NỔI BẬT:
+    - Drawing API ESP: Vẽ khung, tên, máu trực tiếp lên màn hình (FPS cao).
+    - Smart Aimbot: Wallcheck (xuyên tường), FOV Circle, Smoothness.
+    - Combat: Kill Aura, Hitbox Expander, TriggerBot.
+    - Movement: Fly CFrame (Bay xuyên tường), Speed, Jump, Noclip.
+    - Security: Anti-Kick, Anti-AFK.
 ]]
+
+-- ================= KHỞI TẠO SERVICES & LIBRARY =================
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
--- ================= SERVICES =================
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
--- ================= VARIABLES =================
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+-- ================= BIẾN TOÀN CỤC (VARIABLES) =================
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
--- ================= CONFIGURATION =================
+
+-- Quản lý Drawing ESP (Cache)
+local ESP_Cache = {}
+local FOVCircle = Drawing.new("Circle")
+
+-- Cấu hình mặc định vòng tròn FOV
+FOVCircle.Visible = false
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.NumSides = 64
+
+-- ================= CẤU HÌNH (CONFIG) =================
 local Options = Fluent.Options
 local Config = {
     -- Aimbot
     Aimbot = false,
-    AimMode = "Nearest Character",
     AimPart = "Head",
-    AimSmooth = 0.1,
-    RotateCharacter = true,
-    WallCheck = false, -- New
-    StickyAim = false, -- New
-    FOVAim = false, -- New
-    FOVSize = 150, -- New
-    SilentAim = false, -- New
-    Prediction = false, -- New
-    PredictionAmount = 0.165, -- New
-  
+    AimSmooth = 0.1, -- Độ mượt (thấp = aim cứng, cao = aim mềm)
+    RotateCharacter = true, -- Xoay nhân vật theo mục tiêu
+    WallCheck = true, -- Kiểm tra tường
+    ShowFOV = false,
+    FOVRadius = 150,
+    TeamCheck = true,
+    TargetMode = "Distance", -- Distance (Khoảng cách) hoặc Health (Máu thấp nhất)
+
     -- Combat
     KillAura = false,
     KillAuraRange = 20,
     TriggerBot = false,
     Hitbox = false,
     HitboxSize = 10,
-    Spinbot = false,
-    SpinSpeed = 50,
-    Dodge = false,
-    DodgeSpeed = 5,
-    DodgePower = 2,
-    Jitter = false, -- New
-    JitterAngle = 180, -- New
-    FakeLag = false, -- New
-    FakeLagAmount = 0.1, -- New
-    NoRecoil = false, -- New
-    InfiniteAmmo = false, -- New
-    GodMode = false, -- New
-  
-    -- Visuals
-    ESP = false,
-    ESPTeamCheck = true,
-    Tracers = false, -- New
-    Boxes = false, -- New
-    HealthBars = false, -- New
-    Distance = false, -- New
-    PlayerList = {}, -- New
-  
+    HitboxTransparency = 0.7,
+    AutoClicker = false,
+
+    -- Visuals (ESP)
+    ESP_Enabled = false,
+    ESP_Box = false,
+    ESP_Tracer = false,
+    ESP_Name = false,
+    ESP_Health = false,
+    ESP_Distance = false,
+    
     -- Movement
     WalkSpeed = 16,
     JumpPower = 50,
@@ -72,350 +87,378 @@ local Config = {
     FlySpeed = 50,
     Noclip = false,
     InfJump = false,
-    Bhop = false, -- New
-    BhopSpeed = 50, -- New
-    Teleport = false, -- New
-    TeleportTarget = "", -- New
-  
-    -- Security
-    AntiKick = false,
-    AntiAFK = true,
-  
+
     -- Misc
-    AutoFarm = false, -- New, if game has farmable elements
+    FPSBoost = false,
+    FullBright = false,
+    AntiKick = false,
+    AntiAFK = true
 }
--- ================= UI SETUP =================
+
+-- ================= GIAO DIỆN (UI SETUP) =================
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP V4",
-    SubTitle = "by DinoDev Enhanced",
+    Title = "DinoPVP BETA",
+    SubTitle = "by DinoDev",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
+    Acrylic = true, 
     Theme = "Darker",
     MinimizeKey = Enum.KeyCode.RightControl
 })
+
 local Tabs = {
     Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "crosshair" }),
+    Visuals = Window:AddTab({ Title = "ESP & Visuals", Icon = "eye" }),
     Combat = Window:AddTab({ Title = "Combat", Icon = "swords" }),
-    Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
     Movement = Window:AddTab({ Title = "Movement", Icon = "move" }),
-    Security = Window:AddTab({ Title = "Security", Icon = "shield" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "star" }), -- New Tab
+    Misc = Window:AddTab({ Title = "Misc", Icon = "box" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
--- ================= HELPER FUNCTIONS =================
-local function IsValidEnemy(plr)
+
+-- ================= HÀM HỖ TRỢ (HELPER FUNCTIONS) =================
+
+-- Kiểm tra mục tiêu hợp lệ (Sống, Khác team, Có nhân vật)
+local function IsValidTarget(plr)
     if not plr or plr == LocalPlayer or not plr.Character then return false end
     local hum = plr.Character:FindFirstChild("Humanoid")
     local root = plr.Character:FindFirstChild("HumanoidRootPart")
-  
+    
     if not hum or not root or hum.Health <= 0 then return false end
-  
-    if Config.ESPTeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+    
+    -- Kiểm tra ForceField (Bất tử)
+    if plr.Character:FindFirstChild("ForceField") then return false end
+
+    -- Kiểm tra Team
+    if Config.TeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
         return false
     end
-  
-    if plr.Character:FindFirstChild("ForceField") then return false end
-  
-    -- Wallcheck New
-    if Config.WallCheck then
-        local ray = Ray.new(Camera.CFrame.Position, (root.Position - Camera.CFrame.Position).Unit * 1000)
-        local hit, pos = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character})
-        if hit and hit:IsDescendantOf(plr.Character) then
-            return true
-        else
-            return false
-        end
-    end
-  
+
     return true
 end
-local function GetClosestPlayerToChar()
-    local closestPlr = nil
-    local shortestDist = math.huge
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-  
-    if not myRoot then return nil end
-    for _, v in pairs(Players:GetPlayers()) do
-        if IsValidEnemy(v) then
-            local dist = (myRoot.Position - v.Character.HumanoidRootPart.Position).Magnitude
-            if dist < shortestDist then
-                closestPlr = v
-                shortestDist = dist
-            end
+
+-- Kiểm tra tường (Raycasting)
+local function IsVisible(targetPart)
+    if not Config.WallCheck then return true end
+    
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.IgnoreWater = true
+
+    local result = Workspace:Raycast(origin, direction, rayParams)
+    if result then
+        if result.Instance:IsDescendantOf(targetPart.Parent) then
+            return true
         end
+        return false
     end
-    return closestPlr
+    return true
 end
-local function GetClosestPlayerInFOV()
-    local closestPlr = nil
-    local shortestDist = Config.FOVSize
+
+-- Tìm mục tiêu gần nhất
+local function GetClosestPlayer()
+    local bestTarget = nil
+    local bestScore = math.huge -- Khoảng cách hoặc Máu
     local mousePos = UserInputService:GetMouseLocation()
-  
-    for _, v in pairs(Players:GetPlayers()) do
-        if IsValidEnemy(v) then
-            local pos, onScreen = Camera:WorldToViewportPoint(v.Character[Config.AimPart].Position)
-            if onScreen then
-                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                if dist < shortestDist then
-                    closestPlr = v
-                    shortestDist = dist
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if IsValidTarget(plr) then
+            local char = plr.Character
+            local part = char:FindFirstChild(Config.AimPart) or char:FindFirstChild("Head")
+            
+            if part and IsVisible(part) then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                
+                if onScreen then
+                    local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    
+                    -- Kiểm tra bán kính FOV
+                    if distToMouse <= Config.FOVRadius then
+                        if Config.TargetMode == "Distance" then
+                            if distToMouse < bestScore then
+                                bestScore = distToMouse
+                                bestTarget = plr
+                            end
+                        elseif Config.TargetMode == "Health" then
+                            local hp = char.Humanoid.Health
+                            if hp < bestScore then
+                                bestScore = hp
+                                bestTarget = plr
+                            end
+                        end
+                    end
                 end
             end
         end
     end
-    return closestPlr
+    return bestTarget
 end
-local function AttackClick()
+
+-- Giả lập click chuột (Cho TriggerBot/KillAura)
+local function Attack()
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
     task.wait(0.01)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 end
-local function DrawFOV()
-    local fovCircle = Drawing.new("Circle")
-    fovCircle.Visible = Config.FOVAim
-    fovCircle.Radius = Config.FOVSize
-    fovCircle.Color = Color3.fromRGB(255, 255, 255)
-    fovCircle.Thickness = 1
-    fovCircle.Filled = false
-    fovCircle.Transparency = 1
-    fovCircle.Position = UserInputService:GetMouseLocation()
-    return fovCircle
-end
-local fovCircle = DrawFOV() -- New FOV Draw
--- ================= UI ELEMENTS =================
--- [[ AIMBOT TAB ]]
-local AimGroup = Tabs.Aimbot:AddSection("Targeting System")
-AimGroup:AddToggle("AimbotToggle", {Title = "Enable Aimbot", Default = false, Callback = function(v) Config.Aimbot = v end})
-AimGroup:AddDropdown("AimPart", {
-    Title = "Aim Part",
-    Values = {"Head", "HumanoidRootPart", "Torso"},
-    Default = "Head",
-    Multi = false,
-    Callback = function(v) Config.AimPart = v end
-})
-AimGroup:AddToggle("RotateChar", {
-    Title = "Rotate Character",
-    Default = true,
-    Callback = function(v) Config.RotateCharacter = v end
-})
-AimGroup:AddSlider("AimSmooth", {
-    Title = "Smoothness",
-    Min = 0, Max = 1, Default = 0.1, Rounding = 2,
-    Callback = function(v) Config.AimSmooth = v end
-})
-AimGroup:AddToggle("WallCheck", {Title = "Wall Check", Default = false, Callback = function(v) Config.WallCheck = v end}) -- New
-AimGroup:AddToggle("StickyAim", {Title = "Sticky Aim", Default = false, Callback = function(v) Config.StickyAim = v end}) -- New
-AimGroup:AddToggle("FOVAim", {Title = "FOV Aim", Default = false, Callback = function(v) Config.FOVAim = v; fovCircle.Visible = v end}) -- New
-AimGroup:AddSlider("FOVSize", {Title = "FOV Size", Min = 50, Max = 500, Default = 150, Rounding = 0, Callback = function(v) Config.FOVSize = v; fovCircle.Radius = v end}) -- New
-AimGroup:AddToggle("SilentAim", {Title = "Silent Aim", Default = false, Callback = function(v) Config.SilentAim = v end}) -- New
-AimGroup:AddToggle("Prediction", {Title = "Prediction", Default = false, Callback = function(v) Config.Prediction = v end}) -- New
-AimGroup:AddSlider("PredictionAmount", {Title = "Prediction Amount", Min = 0.1, Max = 0.5, Default = 0.165, Rounding = 3, Callback = function(v) Config.PredictionAmount = v end}) -- New
--- [[ COMBAT TAB ]]
-local CombatGroup = Tabs.Combat:AddSection("PVP Enhancements")
-CombatGroup:AddToggle("KillAura", {Title = "Kill Aura", Default = false, Callback = function(v) Config.KillAura = v end})
-CombatGroup:AddSlider("AuraRange", {Title = "Kill Aura Range", Min = 5, Max = 50, Default = 20, Rounding = 0, Callback = function(v) Config.KillAuraRange = v end})
-CombatGroup:AddToggle("TriggerBot", {Title = "TriggerBot", Default = false, Callback = function(v) Config.TriggerBot = v end})
-CombatGroup:AddToggle("Hitbox", {Title = "Hitbox Expander", Default = false, Callback = function(v) Config.Hitbox = v end})
-CombatGroup:AddSlider("HitboxSize", {Title = "Hitbox Size", Min = 2, Max = 30, Default = 10, Rounding = 0, Callback = function(v) Config.HitboxSize = v end})
-CombatGroup:AddToggle("NoRecoil", {Title = "No Recoil", Default = false, Callback = function(v) Config.NoRecoil = v end}) -- New
-CombatGroup:AddToggle("InfiniteAmmo", {Title = "Infinite Ammo", Default = false, Callback = function(v) Config.InfiniteAmmo = v end}) -- New
-CombatGroup:AddToggle("GodMode", {Title = "God Mode", Default = false, Callback = function(v) Config.GodMode = v end}) -- New
-local AntiAimGroup = Tabs.Combat:AddSection("Anti-Aim / Dodge")
-AntiAimGroup:AddToggle("Spinbot", {Title = "Spinbot", Default = false, Callback = function(v) Config.Spinbot = v end})
-AntiAimGroup:AddSlider("SpinSpeed", {Title = "Spin Speed", Min = 10, Max = 100, Default = 50, Rounding = 0, Callback = function(v) Config.SpinSpeed = v end})
-AntiAimGroup:AddToggle("Dodge", {Title = "Auto Dodge (Strafe)", Default = false, Callback = function(v) Config.Dodge = v end})
-AntiAimGroup:AddToggle("Jitter", {Title = "Jitter Anti-Aim", Default = false, Callback = function(v) Config.Jitter = v end}) -- New
-AntiAimGroup:AddSlider("JitterAngle", {Title = "Jitter Angle", Min = 90, Max = 360, Default = 180, Rounding = 0, Callback = function(v) Config.JitterAngle = v end}) -- New
-AntiAimGroup:AddToggle("FakeLag", {Title = "Fake Lag", Default = false, Callback = function(v) Config.FakeLag = v end}) -- New
-AntiAimGroup:AddSlider("FakeLagAmount", {Title = "Fake Lag Amount", Min = 0.05, Max = 0.5, Default = 0.1, Rounding = 2, Callback = function(v) Config.FakeLagAmount = v end}) -- New
--- [[ VISUALS TAB ]]
-local VisualsGroup = Tabs.Visuals:AddSection("ESP Settings")
-VisualsGroup:AddToggle("ESP", {Title = "Enable ESP (Highlight)", Default = false, Callback = function(v) Config.ESP = v end})
-VisualsGroup:AddToggle("ESPTeam", {Title = "Team Check", Default = true, Callback = function(v) Config.ESPTeamCheck = v end})
-VisualsGroup:AddToggle("HealthBars", {Title = "Health Bars", Default = false, Callback = function(v) Config.HealthBars = v end}) -- New
-VisualsGroup:AddToggle("Distance", {Title = "Distance Display", Default = false, Callback = function(v) Config.Distance = v end}) -- New
-local PlayerListGroup = Tabs.Visuals:AddSection("Player List")
-PlayerListGroup:AddDropdown("PlayerList", {
-    Title = "Select Players for ESP",
-    Values = table.unpack(Players:GetPlayers()),
-    Multi = true,
-    Callback = function(v) Config.PlayerList = v end
-}) -- New, simplified
--- [[ MOVEMENT TAB ]]
-local MoveGroup = Tabs.Movement:AddSection("Character")
-MoveGroup:AddToggle("Fly", {Title = "Fly Mode", Default = false, Callback = function(v) Config.Fly = v end})
-MoveGroup:AddSlider("FlySpeed", {Title = "Fly Speed", Min = 10, Max = 200, Default = 50, Rounding = 0, Callback = function(v) Config.FlySpeed = v end})
-MoveGroup:AddSlider("WS", {Title = "WalkSpeed", Min = 16, Max = 300, Default = 16, Rounding = 0, Callback = function(v) Config.WalkSpeed = v end})
-MoveGroup:AddSlider("JP", {Title = "JumpPower", Min = 50, Max = 400, Default = 50, Rounding = 0, Callback = function(v) Config.JumpPower = v end})
-MoveGroup:AddToggle("Noclip", {Title = "Noclip", Default = false, Callback = function(v) Config.Noclip = v end})
-MoveGroup:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callback = function(v) Config.InfJump = v end})
-MoveGroup:AddToggle("Bhop", {Title = "Bunny Hop", Default = false, Callback = function(v) Config.Bhop = v end}) -- New
-MoveGroup:AddSlider("BhopSpeed", {Title = "Bhop Speed", Min = 20, Max = 100, Default = 50, Rounding = 0, Callback = function(v) Config.BhopSpeed = v end}) -- New
-MoveGroup:AddInput("TeleportTarget", {Title = "Teleport Target", Callback = function(v) Config.TeleportTarget = v end}) -- New
-MoveGroup:AddButton({Title = "Teleport", Callback = function() 
-    local targetPlr = Players:FindFirstChild(Config.TeleportTarget)
-    if targetPlr and targetPlr.Character then 
-        LocalPlayer.Character.HumanoidRootPart.CFrame = targetPlr.Character.HumanoidRootPart.CFrame 
-    end 
-end}) -- New
--- [[ SECURITY TAB ]]
-local SecurityGroup = Tabs.Security:AddSection("Super Antiban")
-SecurityGroup:AddToggle("AntiKick", {
-    Title = "Anti-Kick (Client)",
-    Default = false,
-    Callback = function(v)
-        Config.AntiKick = v
-        if v then Fluent:Notify({Title = "Security", Content = "Anti-Kick Active", Duration = 3}) end
-    end
-})
-SecurityGroup:AddToggle("AntiAFK", {
-    Title = "Anti-AFK",
-    Default = true,
-    Callback = function(v) Config.AntiAFK = v end
-})
-SecurityGroup:AddButton({
-    Title = "Panic Button",
-    Callback = function()
-        for k in pairs(Config) do Config[k] = false end
-        Config.WalkSpeed = 16
-        Config.JumpPower = 50
-        Window:Dialog({Title = "Panic Mode", Content = "All features disabled.", Buttons = {{ Title = "OK" }}})
-    end
-})
--- [[ MISC TAB ]] -- New
-local MiscGroup = Tabs.Misc:AddSection("Miscellaneous")
-MiscGroup:AddToggle("AutoFarm", {Title = "Auto Farm", Default = false, Callback = function(v) Config.AutoFarm = v end}) -- New, implement logic if game supports
--- ================= LOGIC LOOPS =================
--- ANTI-KICK IMPLEMENTATION
-local OldNameCall = nil
-pcall(function()
-    if getnamecallmethod and hookmetamethod then
-        OldNameCall = hookmetamethod(game, "__namecall", function(Self, ...)
-            local Args = {...}
-            local Method = getnamecallmethod()
-          
-            if Config.AntiKick and Self == LocalPlayer and (Method == "Kick" or Method == "kick") then
-                return nil
-            end
-          
-            return OldNameCall(Self, unpack(Args))
-        end)
-    end
-end)
--- ANTI-AFK
-LocalPlayer.Idled:Connect(function()
-    if Config.AntiAFK then
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end
-end)
--- Replace the AIMBOT ENGINE (RunService.RenderStepped) with this fixed version
 
-RunService.RenderStepped:Connect(function()
-    if not Config.Aimbot then return end
+-- ================= HỆ THỐNG ESP (DRAWING API) =================
+local function CreateDrawing(type, props)
+    local d = Drawing.new(type)
+    for k, v in pairs(props) do d[k] = v end
+    return d
+end
+
+local function AddESP(plr)
+    if ESP_Cache[plr] then return end
     
-    local target = nil
-    if Config.FOVAim then
-        target = GetClosestPlayerInFOV()
-    else
-        target = GetClosestPlayerToChar()
+    ESP_Cache[plr] = {
+        Box = CreateDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(255, 0, 0), Filled = false, Visible = false}),
+        Tracer = CreateDrawing("Line", {Thickness = 1.5, Color = Color3.fromRGB(255, 0, 0), Visible = false}),
+        Name = CreateDrawing("Text", {Size = 14, Center = true, Outline = true, Color = Color3.fromRGB(255, 255, 255), Visible = false}),
+        HealthBar = CreateDrawing("Square", {Thickness = 1, Filled = true, Visible = false}),
+        HealthOutline = CreateDrawing("Square", {Thickness = 1, Color = Color3.new(0,0,0), Filled = false, Visible = false})
+    }
+end
+
+local function RemoveESP(plr)
+    if ESP_Cache[plr] then
+        for _, d in pairs(ESP_Cache[plr]) do d:Remove() end
+        ESP_Cache[plr] = nil
     end
-    
-    if not target or not target.Character or not target.Character:FindFirstChild(Config.AimPart) or not LocalPlayer.Character then return end
-    
-    local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    local targetPart = target.Character[Config.AimPart]
-    local targetPos = targetPart.Position
-    
-    if Config.Prediction then
-        targetPos = targetPos + (targetPart.Velocity * Config.PredictionAmount)
-    end
-    
-    -- Wall Check (skip if not visible through wall)
-    if Config.WallCheck then
-        local rayOrigin = Camera.CFrame.Position
-        local rayDirection = (targetPos - rayOrigin).Unit * 5000
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-        raycastParams.IgnoreWater = true
-        
-        local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-        if not result or not result.Instance:IsDescendantOf(target.Character) then
-            return -- Target behind wall → skip
-        end
-    end
-    
-    local currentCF = Camera.CFrame
-    local goalCF = CFrame.new(currentCF.Position, targetPos)
-    local lerpAlpha = 1 - Config.AimSmooth
-    
-    -- Camera aim
-    if Config.AimSmooth <= 0.05 then
-        Camera.CFrame = goalCF
-    else
-        Camera.CFrame = currentCF:Lerp(goalCF, lerpAlpha)
-    end
-    
-    -- Character rotation (original logic)
-    if Config.RotateCharacter then
-        local lookAtPos = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
-        local charGoalCF = CFrame.new(rootPart.Position, lookAtPos)
-        if Config.AimSmooth <= 0.05 then
-            rootPart.CFrame = charGoalCF
+end
+
+local function UpdateESP()
+    for plr, esp in pairs(ESP_Cache) do
+        if Config.ESP_Enabled and IsValidTarget(plr) then
+            local char = plr.Character
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChild("Humanoid")
+            
+            if root and hum then
+                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                local scaleFactor = 1000 / pos.Z -- Scale theo khoảng cách
+                local width = 3 * scaleFactor
+                local height = 5 * scaleFactor
+                
+                if onScreen then
+                    local tl = Vector2.new(pos.X - width/2, pos.Y - height/2)
+                    local size = Vector2.new(width, height)
+
+                    -- Box
+                    if Config.ESP_Box then
+                        esp.Box.Visible = true
+                        esp.Box.Position = tl
+                        esp.Box.Size = size
+                    else
+                        esp.Box.Visible = false
+                    end
+
+                    -- Tracer
+                    if Config.ESP_Tracer then
+                        esp.Tracer.Visible = true
+                        esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        esp.Tracer.To = Vector2.new(pos.X, pos.Y + height/2)
+                    else
+                        esp.Tracer.Visible = false
+                    end
+
+                    -- Name
+                    if Config.ESP_Name then
+                        esp.Name.Visible = true
+                        esp.Name.Position = Vector2.new(pos.X, tl.Y - 15)
+                        esp.Name.Text = string.format("%s [%.0fm]", plr.Name, (root.Position - Camera.CFrame.Position).Magnitude)
+                    else
+                        esp.Name.Visible = false
+                    end
+
+                    -- Health Bar
+                    if Config.ESP_Health then
+                        esp.HealthOutline.Visible = true
+                        esp.HealthBar.Visible = true
+                        
+                        local barWidth = 2
+                        local barOffset = 4
+                        local healthPercent = hum.Health / hum.MaxHealth
+                        local barHeight = height * healthPercent
+
+                        esp.HealthOutline.Position = Vector2.new(tl.X - barOffset - barWidth, tl.Y)
+                        esp.HealthOutline.Size = Vector2.new(barWidth, height)
+                        
+                        esp.HealthBar.Position = Vector2.new(tl.X - barOffset - barWidth, tl.Y + (height - barHeight))
+                        esp.HealthBar.Size = Vector2.new(barWidth, barHeight)
+                        esp.HealthBar.Color = Color3.fromHSV(healthPercent * 0.3, 1, 1) -- Xanh -> Đỏ
+                    else
+                        esp.HealthOutline.Visible = false
+                        esp.HealthBar.Visible = false
+                    end
+
+                else
+                    -- Offscreen
+                    for _, v in pairs(esp) do v.Visible = false end
+                end
+            else
+                for _, v in pairs(esp) do v.Visible = false end
+            end
         else
-            rootPart.CFrame = rootPart.CFrame:Lerp(charGoalCF, lerpAlpha)
+            for _, v in pairs(esp) do v.Visible = false end
         end
     end
-    
-    -- TriggerBot (fixed: check if mouse is over enemy part)
-    if Config.TriggerBot then
-        local mouseTarget = Mouse.Target
-        if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
-            AttackClick()
+end
+
+-- ================= UI ELEMENTS (CÁC NÚT CHỨC NĂNG) =================
+
+-- [[ TAB AIMBOT ]]
+local AimSection = Tabs.Aimbot:AddSection("Main Aimbot")
+AimSection:AddToggle("AimbotToggle", {Title = "Enable Aimbot", Default = false, Callback = function(v) Config.Aimbot = v end})
+AimSection:AddDropdown("AimPart", {Title = "Aim Part", Values = {"Head", "HumanoidRootPart", "Torso"}, Default = "Head", Callback = function(v) Config.AimPart = v end})
+AimSection:AddSlider("AimSmooth", {Title = "Smoothness", Min = 0, Max = 1, Default = 0.1, Rounding = 2, Callback = function(v) Config.AimSmooth = v end})
+AimSection:AddToggle("RotateChar", {Title = "Rotate Character", Description = "Xoay người về phía địch", Default = true, Callback = function(v) Config.RotateCharacter = v end})
+
+local AimSettings = Tabs.Aimbot:AddSection("Settings")
+AimSettings:AddToggle("WallCheck", {Title = "Wall Check", Default = true, Callback = function(v) Config.WallCheck = v end})
+AimSettings:AddToggle("TeamCheck", {Title = "Team Check", Default = true, Callback = function(v) Config.TeamCheck = v end})
+AimSettings:AddToggle("ShowFOV", {Title = "Show FOV Circle", Default = false, Callback = function(v) Config.ShowFOV = v; FOVCircle.Visible = v end})
+AimSettings:AddSlider("FOVRadius", {Title = "FOV Radius", Min = 20, Max = 800, Default = 150, Rounding = 0, Callback = function(v) Config.FOVRadius = v; FOVCircle.Radius = v end})
+
+-- [[ TAB VISUALS ]]
+local ESPSection = Tabs.Visuals:AddSection("ESP Configuration")
+ESPSection:AddToggle("ESPEnable", {Title = "Master ESP Switch", Default = false, Callback = function(v) Config.ESP_Enabled = v end})
+ESPSection:AddToggle("ESPBox", {Title = "Draw Box", Default = false, Callback = function(v) Config.ESP_Box = v end})
+ESPSection:AddToggle("ESPTracer", {Title = "Draw Tracers", Default = false, Callback = function(v) Config.ESP_Tracer = v end})
+ESPSection:AddToggle("ESPName", {Title = "Draw Names", Default = false, Callback = function(v) Config.ESP_Name = v end})
+ESPSection:AddToggle("ESPHealth", {Title = "Draw Health Bar", Default = false, Callback = function(v) Config.ESP_Health = v end})
+
+-- [[ TAB COMBAT ]]
+local CombatSection = Tabs.Combat:AddSection("PVP Tools")
+CombatSection:AddToggle("KillAura", {Title = "Kill Aura", Description = "Tự động đánh địch trong phạm vi", Default = false, Callback = function(v) Config.KillAura = v end})
+CombatSection:AddSlider("AuraRange", {Title = "Aura Range", Min = 5, Max = 50, Default = 20, Rounding = 0, Callback = function(v) Config.KillAuraRange = v end})
+CombatSection:AddToggle("TriggerBot", {Title = "TriggerBot", Description = "Tự bắn khi tâm ngắm trúng địch", Default = false, Callback = function(v) Config.TriggerBot = v end})
+
+local HitboxSection = Tabs.Combat:AddSection("Hitbox Expander")
+HitboxSection:AddToggle("Hitbox", {Title = "Enable Hitbox", Description = "Làm to nhân vật địch", Default = false, Callback = function(v) Config.Hitbox = v end})
+HitboxSection:AddSlider("HitboxSize", {Title = "Size", Min = 2, Max = 30, Default = 10, Rounding = 0, Callback = function(v) Config.HitboxSize = v end})
+
+-- [[ TAB MOVEMENT ]]
+local MoveSection = Tabs.Movement:AddSection("Character Modifications")
+MoveSection:AddToggle("Fly", {Title = "Fly (CFrame)", Default = false, Callback = function(v) Config.Fly = v end})
+MoveSection:AddSlider("FlySpeed", {Title = "Fly Speed", Min = 10, Max = 300, Default = 50, Rounding = 0, Callback = function(v) Config.FlySpeed = v end})
+MoveSection:AddToggle("Noclip", {Title = "Noclip", Description = "Đi xuyên tường", Default = false, Callback = function(v) Config.Noclip = v end})
+MoveSection:AddSlider("WS", {Title = "WalkSpeed", Min = 16, Max = 500, Default = 16, Rounding = 0, Callback = function(v) Config.WalkSpeed = v end})
+MoveSection:AddSlider("JP", {Title = "JumpPower", Min = 50, Max = 500, Default = 50, Rounding = 0, Callback = function(v) Config.JumpPower = v end})
+MoveSection:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callback = function(v) Config.InfJump = v end})
+
+-- [[ TAB MISC ]]
+local MiscSection = Tabs.Misc:AddSection("Utility")
+MiscSection:AddToggle("FPSBoost", {Title = "FPS Boost", Description = "Xóa texture, giảm lag", Default = false, Callback = function(v)
+    Config.FPSBoost = v
+    if v then
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("Texture") or obj:IsA("Decal") then obj:Destroy() end
+        end
+        Lighting.GlobalShadows = false
+    end
+end})
+MiscSection:AddToggle("FullBright", {Title = "Fullbright", Default = false, Callback = function(v)
+    Config.FullBright = v
+    if v then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+    else
+        Lighting.Brightness = 1
+        Lighting.ClockTime = 12
+        Lighting.FogEnd = 1000
+    end
+end})
+
+-- [[ TAB SETTINGS ]]
+local SettingsSection = Tabs.Settings:AddSection("Security & Config")
+SettingsSection:AddToggle("AntiKick", {Title = "Anti-Kick", Description = "Chống bị game kick (Client Side)", Default = false, Callback = function(v) Config.AntiKick = v end})
+SettingsSection:AddToggle("AntiAFK", {Title = "Anti-AFK", Default = true, Callback = function(v) Config.AntiAFK = v end})
+SettingsSection:AddButton({
+    Title = "Unload Script",
+    Description = "Tắt script và xóa UI",
+    Callback = function()
+        Window:Destroy()
+        FOVCircle:Remove()
+        for _, esp in pairs(ESP_Cache) do
+            for _, d in pairs(esp) do d:Remove() end
+        end
+    end
+})
+
+-- ================= LOGIC LOOPS (VÒNG LẶP CHÍNH) =================
+
+-- 1. RenderStepped: UI, ESP, Aimbot Camera
+RunService.RenderStepped:Connect(function()
+    -- Cập nhật FOV Circle theo chuột
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    FOVCircle.Radius = Config.FOVRadius
+    FOVCircle.Visible = Config.ShowFOV
+
+    -- Cập nhật ESP
+    UpdateESP()
+
+    -- Aimbot Logic
+    if Config.Aimbot then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild(Config.AimPart) then
+            local targetPos = target.Character[Config.AimPart].Position
+            local currentCF = Camera.CFrame
+            local goalCF = CFrame.new(currentCF.Position, targetPos)
+            
+            -- Smooth Aim
+            if Config.AimSmooth <= 0.05 then
+                Camera.CFrame = goalCF
+            else
+                Camera.CFrame = currentCF:Lerp(goalCF, 1 - Config.AimSmooth)
+            end
+
+            -- Rotate Character (Logic cũ)
+            if Config.RotateCharacter and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                local lookAt = Vector3.new(targetPos.X, hrp.Position.Y, targetPos.Z)
+                hrp.CFrame = CFrame.new(hrp.Position, lookAt)
+            end
+            
+            -- TriggerBot Logic
+            if Config.TriggerBot then
+                local mouseTarget = Mouse.Target
+                if mouseTarget and mouseTarget:IsDescendantOf(target.Character) then
+                    Attack()
+                end
+            end
         end
     end
 end)
--- PHYSICS ENGINE
+
+-- 2. Heartbeat: Physics, Movement, Combat
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     local hrp = char.HumanoidRootPart
     local hum = char:FindFirstChild("Humanoid")
-  
-    -- Kill Aura
-    if Config.KillAura then
-        for _, v in pairs(Players:GetPlayers()) do
-            if IsValidEnemy(v) then
-                local enemyRoot = v.Character:FindFirstChild("HumanoidRootPart")
-                if enemyRoot and (hrp.Position - enemyRoot.Position).Magnitude <= Config.KillAuraRange then
-                    hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(enemyRoot.Position.X, hrp.Position.Y, enemyRoot.Position.Z))
-                    AttackClick()
-                end
-            end
-        end
-    end
-  
-    -- Hitbox
+
+    -- Hitbox Expander
     if Config.Hitbox then
-        for _, v in pairs(Players:GetPlayers()) do
-            if IsValidEnemy(v) then
-                local eHrp = v.Character:FindFirstChild("HumanoidRootPart")
+        for _, plr in pairs(Players:GetPlayers()) do
+            if IsValidTarget(plr) then
+                local eHrp = plr.Character:FindFirstChild("HumanoidRootPart")
                 if eHrp then
                     eHrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
-                    eHrp.Transparency = 0.6
+                    eHrp.Transparency = Config.HitboxTransparency
                     eHrp.CanCollide = false
-                    eHrp.Color = Color3.fromRGB(255, 0, 0)
                 end
             end
         end
     else
-        for _, v in pairs(Players:GetPlayers()) do
-            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-                local eHrp = v.Character.HumanoidRootPart
+        -- Reset Hitbox (Cơ bản)
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local eHrp = plr.Character.HumanoidRootPart
                 if eHrp.Size.X == Config.HitboxSize then
                     eHrp.Size = Vector3.new(2, 2, 1)
                     eHrp.Transparency = 1
@@ -423,238 +466,121 @@ RunService.Heartbeat:Connect(function()
             end
         end
     end
-  
-    -- Spinbot
-    if Config.Spinbot then
-        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed), 0)
-    end
-  
-    -- Dodge
-    if Config.Dodge then
-        local currentTime = tick()
-        local strafeOffset = math.sin(currentTime * Config.DodgeSpeed) * Config.DodgePower
-        hrp.CFrame = hrp.CFrame * CFrame.new(strafeOffset, 0, 0)
-    end
-  
-    -- Jitter New
-    if Config.Jitter then
-        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(math.random(-Config.JitterAngle, Config.JitterAngle)), 0)
-    end
-  
-    -- Fake Lag New
-    if Config.FakeLag then
-        task.wait(Config.FakeLagAmount)
-    end
-  
-    -- No Recoil New (assume camera shake, placeholder)
-    if Config.NoRecoil then
-        Camera.CameraType = Enum.CameraType.Scriptable -- Lock to prevent recoil
-    end
-  
-    -- Infinite Ammo New (hook tool ammo if exists)
-    if Config.InfiniteAmmo and char:FindFirstChildOfClass("Tool") then
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool:FindFirstChild("Ammo") then
-            tool.Ammo.Value = math.huge
+
+    -- Kill Aura
+    if Config.KillAura then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if IsValidTarget(plr) then
+                local eHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                if eHrp and (hrp.Position - eHrp.Position).Magnitude <= Config.KillAuraRange then
+                    -- Quay mặt về địch để đánh
+                    hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(eHrp.Position.X, hrp.Position.Y, eHrp.Position.Z))
+                    Attack()
+                end
+            end
         end
     end
-  
-    -- God Mode New (set health max)
-    if Config.GodMode and hum then
-        hum.Health = hum.MaxHealth
-    end
-  
-    -- Fly
+
+    -- Fly Logic
     if Config.Fly then
-        local bv = hrp:FindFirstChild("DinoFly") or Instance.new("BodyVelocity")
-        bv.Name = "DinoFly"
+        local bv = hrp:FindFirstChild("DinoFlyVelocity") or Instance.new("BodyVelocity")
+        bv.Name = "DinoFlyVelocity"
         bv.Parent = hrp
-        bv.MaxForce = Vector3.new(100000, 100000, 100000)
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        
         local camCF = Camera.CFrame
-        local velocity = Vector3.new()
-      
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then velocity = velocity + camCF.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then velocity = velocity - camCF.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then velocity = velocity - camCF.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then velocity = velocity + camCF.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then velocity = velocity + Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then velocity = velocity - Vector3.new(0, 1, 0) end
-      
-        bv.Velocity = velocity * Config.FlySpeed
+        local vel = Vector3.new()
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel = vel + camCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel = vel - camCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel = vel - camCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel = vel + camCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then vel = vel - Vector3.new(0, 1, 0) end
+        
+        bv.Velocity = vel * Config.FlySpeed
     else
-        local bv = hrp:FindFirstChild("DinoFly")
+        local bv = hrp:FindFirstChild("DinoFlyVelocity")
         if bv then bv:Destroy() end
     end
-  
+
     -- Noclip
     if Config.Noclip then
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
         end
     end
-  
-    -- Speed/Jump
+
+    -- Speed / Jump
     if hum then
         if Config.WalkSpeed > 16 then hum.WalkSpeed = Config.WalkSpeed end
         if Config.JumpPower > 50 then hum.JumpPower = Config.JumpPower end
     end
-  
-    -- Bhop New
-    if Config.Bhop and hum and hum:GetState() == Enum.HumanoidStateType.Freefall then
-        hum:ChangeState("Jumping")
-        hrp.Velocity = hrp.Velocity + (hrp.CFrame.LookVector * Config.BhopSpeed)
-    end
-  
-    -- Auto Farm New (placeholder, adapt to game)
-    if Config.AutoFarm then
-        -- Example: collect items or kill NPCs
-    end
 end)
--- VISUALS ENGINE Enhanced
 
-task.spawn(function()
-    while true do
-        task.wait(0.2)
-        if Config.ESP or Config.Tracers or Config.Boxes or Config.HealthBars or Config.Distance then
-            for _, v in pairs(Players:GetPlayers()) do
-                if v == LocalPlayer or not v.Character then continue end
-                
-                local char = v.Character
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local hum = char:FindFirstChild("Humanoid")
-                
-                if not root or not hum or hum.Health <= 0 then
-                    -- Cleanup
-                    for _, name in pairs({"DinoESP", "DinoTracer", "DinoBox", "DinoHealthBar", "DinoDist"}) do
-                        local obj = char:FindFirstChild(name)
-                        if obj then obj:Destroy() end
-                    end
-                    continue
-                end
-                
-                if not IsValidEnemy(v) then
-                    -- Cleanup if not valid
-                    for _, name in pairs({"DinoESP", "DinoTracer", "DinoBox", "DinoHealthBar", "DinoDist"}) do
-                        local obj = char:FindFirstChild(name)
-                        if obj then obj:Destroy() end
-                    end
-                    continue
-                end
-                
-                -- Highlight ESP
-                if Config.ESP then
-                    local hl = char:FindFirstChild("DinoESP") or Instance.new("Highlight")
-                    hl.Name = "DinoESP"
-                    hl.Adornee = char
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.FillTransparency = 0.5
-                    hl.OutlineTransparency = 0
-                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    hl.Parent = char
-                end
-                
-                -- Tracers
-                if Config.Tracers then
-                    local tracer = char:FindFirstChild("DinoTracer") or Drawing.new("Line")
-                    tracer.Name = "DinoTracer"
-                    tracer.Visible = true
-                    tracer.Color = Color3.fromRGB(255, 0, 0)
-                    tracer.Thickness = 2
-                    tracer.Transparency = 1
-                    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                    tracer.From = screenCenter
-                    tracer.To = Vector2.new(rootPos.X, rootPos.Y)
-                    tracer.Visible = onScreen
-                end
-                
-                -- 2D Boxes
-                if Config.Boxes then
-                    local box = char:FindFirstChild("DinoBox") or Drawing.new("Square")
-                    box.Name = "DinoBox"
-                    box.Visible = true
-                    box.Color = Color3.fromRGB(255, 0, 0)
-                    box.Thickness = 2
-                    box.Filled = false
-                    box.Transparency = 1
-                    
-                    local headPos = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
-                    local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-                    
-                    if headPos.Z > 0 and legPos.Z > 0 then
-                        local sizeY = math.abs(headPos.Y - legPos.Y)
-                        local sizeX = sizeY * 0.6
-                        box.Size = Vector2.new(sizeX, sizeY)
-                        box.Position = Vector2.new(
-                            headPos.X - sizeX / 2,
-                            headPos.Y
-                        )
-                        box.Visible = true
-                    else
-                        box.Visible = false
-                    end
-                end
-                
-                -- Health Bars
-                if Config.HealthBars then
-                    local bar = char:FindFirstChild("DinoHealthBar") or Drawing.new("Line")
-                    bar.Name = "DinoHealthBar"
-                    bar.Visible = true
-                    bar.Thickness = 3
-                    bar.Color = Color3.fromHSV(0.3 * (hum.Health / hum.MaxHealth), 1, 1)
-                    bar.Transparency = 1
-                    
-                    local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                    if onScreen then
-                        local healthPct = hum.Health / hum.MaxHealth
-                        local barLength = 80
-                        local offset = 40
-                        bar.From = Vector2.new(rootPos.X - barLength / 2, rootPos.Y - offset)
-                        bar.To = Vector2.new(rootPos.X - barLength / 2 + barLength * healthPct, rootPos.Y - offset)
-                        bar.Visible = true
-                    else
-                        bar.Visible = false
-                    end
-                end
-                
-                -- Distance
-                if Config.Distance then
-                    local distText = char:FindFirstChild("DinoDist") or Drawing.new("Text")
-                    distText.Name = "DinoDist"
-                    distText.Visible = true
-                    distText.Color = Color3.fromRGB(255, 255, 255)
-                    distText.Outline = true
-                    distText.OutlineColor = Color3.fromRGB(0,0,0)
-                    distText.Size = 14
-                    distText.Center = true
-                    
-                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                    distText.Text = math.floor(dist) .. "m"
-                    
-                    local pos, onScreen = Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 2, 0))
-                    distText.Position = Vector2.new(pos.X, pos.Y)
-                    distText.Visible = onScreen
-                end
-            end
-        else
-            -- Cleanup all when disabled
-            for _, v in pairs(Players:GetPlayers()) do
-                if v.Character then
-                    for _, name in pairs({"DinoESP", "DinoTracer", "DinoBox", "DinoHealthBar", "DinoDist"}) do
-                        local obj = v.Character:FindFirstChild(name)
-                        if obj then obj:Destroy() end
-                    end
-                end
-            end
-        end
+-- 3. Event Handling (Xử lý sự kiện)
+
+-- Thêm ESP khi người chơi mới vào
+Players.PlayerAdded:Connect(function(plr)
+    AddESP(plr)
+    plr.CharacterAdded:Connect(function() AddESP(plr) end)
+end)
+
+-- Xóa ESP khi người chơi thoát
+Players.PlayerRemoving:Connect(function(plr)
+    RemoveESP(plr)
+end)
+
+-- Khởi tạo ESP cho người chơi đã có sẵn
+for _, plr in pairs(Players:GetPlayers()) do
+    if plr ~= LocalPlayer then
+        AddESP(plr)
+        plr.CharacterAdded:Connect(function() AddESP(plr) end)
+    end
+end
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+    if Config.InfJump and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum:ChangeState("Jumping") end
     end
 end)
--- ================= FINALIZE =================
+
+-- Anti-Kick (Hook Metamethod)
+local OldNameCall = nil
+pcall(function()
+    if getnamecallmethod and hookmetamethod then
+        OldNameCall = hookmetamethod(game, "__namecall", function(Self, ...)
+            local Method = getnamecallmethod()
+            if Config.AntiKick and Self == LocalPlayer and (Method == "Kick" or Method == "kick") then
+                return nil
+            end
+            return OldNameCall(Self, ...)
+        end)
+    end
+end)
+
+-- Anti-AFK
+LocalPlayer.Idled:Connect(function()
+    if Config.AntiAFK then
+        local vu = game:GetService("VirtualUser")
+        vu:CaptureController()
+        vu:ClickButton2(Vector2.new())
+    end
+end)
+
+-- ================= HOÀN TẤT =================
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetFolder("DinoPVP_V4")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+
 Window:SelectTab(1)
-Fluent:Notify({Title = "DinoPVP V4", Content = "Enhanced Script Loaded", Duration = 5})
+
+Fluent:Notify({
+    Title = "DinoPVP ",
+    Content = "Beta",
+    Duration = 8
+})
