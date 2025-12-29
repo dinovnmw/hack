@@ -233,8 +233,6 @@ AntiAimGroup:AddSlider("FakeLagAmount", {Title = "Fake Lag Amount", Min = 0.05, 
 local VisualsGroup = Tabs.Visuals:AddSection("ESP Settings")
 VisualsGroup:AddToggle("ESP", {Title = "Enable ESP (Highlight)", Default = false, Callback = function(v) Config.ESP = v end})
 VisualsGroup:AddToggle("ESPTeam", {Title = "Team Check", Default = true, Callback = function(v) Config.ESPTeamCheck = v end})
-VisualsGroup:AddToggle("Tracers", {Title = "Tracers", Default = false, Callback = function(v) Config.Tracers = v end}) -- New
-VisualsGroup:AddToggle("Boxes", {Title = "Boxes", Default = false, Callback = function(v) Config.Boxes = v end}) -- New
 VisualsGroup:AddToggle("HealthBars", {Title = "Health Bars", Default = false, Callback = function(v) Config.HealthBars = v end}) -- New
 VisualsGroup:AddToggle("Distance", {Title = "Distance Display", Default = false, Callback = function(v) Config.Distance = v end}) -- New
 local PlayerListGroup = Tabs.Visuals:AddSection("Player List")
