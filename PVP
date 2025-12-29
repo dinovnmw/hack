@@ -77,9 +77,9 @@ local Config: Config = {
     AimPart = "Head",
     Smoothness = 0.1,
     RotateCharacterToTarget = true,
-    WallCheck = true,
+    WallCheck = false,
     ShowFOV = false,
-    FOVRadius = 150,
+    FOVRadius = 250,
     TeamCheck = true,
     TargetMode = "Distance",
     EnableKillAura = false,
@@ -105,8 +105,8 @@ local Config: Config = {
     Noclip = false,
     InfiniteJump = false,
     FPSBoost = false,
-    Fullbright = false,
-    AntiKick = false,
+    Fullbright = true,
+    AntiKick = true,
     AntiAFK = true
 }
 
