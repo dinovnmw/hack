@@ -1,4 +1,3 @@
-
 -- [LAYER 1] SERVICE INITIALIZATION & ABSTRACTION
 local Services = {
     Players = game:GetService("Players"),
@@ -11,7 +10,6 @@ local Services = {
     CoreGui = game:GetService("CoreGui"),
     TweenService = game:GetService("TweenService")
 }
-
 -- Load Fluent UI library with error protection
 local Success, Fluent = pcall(function()
     return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -20,15 +18,12 @@ if not Success or not Fluent then
     warn("[CRITICAL ERROR]: Failed to load Fluent library. Check your internet connection.")
     return
 end
-
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-
 -- [LAYER 1] GLOBAL VARIABLES & TYPE DEFINITIONS
 local LocalPlayer = Services.Players.LocalPlayer
 local CurrentCamera = Services.Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
-
 type Config = {
     -- Aimbot
     EnableAimbot: boolean,
@@ -36,10 +31,9 @@ type Config = {
     Smoothness: number,
     RotateCharacterToTarget: boolean,
     WallCheck: boolean,
-    ShowFOV: boolean,
-    FOVRadius: number,
     TeamCheck: boolean,
     TargetMode: string, -- "Distance" or "Health"
+    AimCursor: boolean,
     -- Combat
     EnableKillAura: boolean,
     AuraRange: number,
@@ -47,6 +41,7 @@ type Config = {
     ExpandHitbox: boolean,
     HitboxSize: number,
     HitboxTransparency: number,
+    Reach: number,
     -- Visuals/ESP
     EnableESP: boolean,
     ShowBox: boolean,
@@ -65,29 +60,42 @@ type Config = {
     FlySpeed: number,
     Noclip: boolean,
     InfiniteJump: boolean,
+    -- Teleport
+    EnableTeleport: boolean,
+    TeleportTarget: string,
+    TeleportLoop: boolean,
+    TeleportSpeed: number,
+    -- Safety
+    EnableSafety: boolean,
+    SafetyHealth: number,
+    EscapeDistance: number,
+    -- Legit
+    EnableLegitAimbot: boolean,
+    LegitSmoothness: number,
+    EnableLegitTween: boolean,
+    LegitTweenSpeed: number,
     -- Misc
     FPSBoost: boolean,
     Fullbright: boolean,
     AntiKick: boolean,
     AntiAFK: boolean
 }
-
 local Config: Config = {
     EnableAimbot = false,
     AimPart = "Head",
     Smoothness = 0.1,
     RotateCharacterToTarget = true,
     WallCheck = false,
-    ShowFOV = false,
-    FOVRadius = 250,
     TeamCheck = true,
     TargetMode = "Distance",
+    AimCursor = false,
     EnableKillAura = false,
     AuraRange = 20,
     TriggerBot = false,
     ExpandHitbox = false,
     HitboxSize = 10,
     HitboxTransparency = 0.7,
+    Reach = 15,
     EnableESP = false,
     ShowBox = false,
     ShowTracer = false,
@@ -104,22 +112,24 @@ local Config: Config = {
     FlySpeed = 50,
     Noclip = false,
     InfiniteJump = false,
+    EnableTeleport = false,
+    TeleportTarget = "",
+    TeleportLoop = false,
+    TeleportSpeed = 100,
+    EnableSafety = false,
+    SafetyHealth = 30,
+    EscapeDistance = 1000,
+    EnableLegitAimbot = false,
+    LegitSmoothness = 0.5,
+    EnableLegitTween = false,
+    LegitTweenSpeed = 50,
     FPSBoost = false,
     Fullbright = true,
     AntiKick = true,
     AntiAFK = true
 }
-
 -- [LAYER 2] DRAWING API & CACHE MANAGEMENT
 local ESPStorage = {}
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = false
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
-FOVCircle.NumSides = 64
-
 local function CreateDrawing(type: string, props: table)
     local obj = Drawing.new(type)
     for k, v in pairs(props) do
@@ -127,86 +137,73 @@ local function CreateDrawing(type: string, props: table)
     end
     return obj
 end
-
 -- [LAYER 3] TARGET VALIDATION & LOGIC
 local function IsValidTarget(player: Player): boolean
     if not player or player == LocalPlayer or not player.Character then return false end
-    
+   
     local char = player.Character
     local humanoid = char:FindFirstChild("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
-    
+   
     if not humanoid or not root or not head or humanoid.Health <= 0 then return false end
     if char:FindFirstChild("ForceField") then return false end
     if Config.TeamCheck and player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then return false end
-    
+   
     return true
 end
-
 local function CanSeeTarget(targetPart: BasePart): boolean
     if not Config.WallCheck then return true end
-    
+   
     local origin = CurrentCamera.CFrame.Position
     local direction = targetPart.Position - origin
-    
+   
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = {LocalPlayer.Character, CurrentCamera}
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.IgnoreWater = true
-    
+   
     local result = Services.Workspace:Raycast(origin, direction, params)
-    
+   
     if result then
         return result.Instance:IsDescendantOf(targetPart.Parent)
     end
     return true
 end
-
-local function GetClosestPlayer()
+local function GetNearestPlayer()
     local bestTarget = nil
-    local bestScore = math.huge
-    local mousePos = Services.UserInputService:GetMouseLocation()
-    
+    local bestDist = math.huge
+   
     for _, player in ipairs(Services.Players:GetPlayers()) do
         if IsValidTarget(player) then
             local char = player.Character
-            local targetPart = char:FindFirstChild(Config.AimPart) or char:FindFirstChild("Head")
-            
-            if targetPart and CanSeeTarget(targetPart) then
-                local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(targetPart.Position)
-                
-                if onScreen then
-                    local distToMouse = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    
-                    if distToMouse <= Config.FOVRadius then
-                        if Config.TargetMode == "Distance" then
-                            if distToMouse < bestScore then
-                                bestScore = distToMouse
-                                bestTarget = player
-                            end
-                        elseif Config.TargetMode == "Health" then
-                            local health = char.Humanoid.Health
-                            if health < bestScore then
-                                bestScore = health
-                                bestTarget = player
-                            end
-                        end
-                    end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                if dist < bestDist and CanSeeTarget(root) then
+                    bestDist = dist
+                    bestTarget = player
                 end
             end
         end
     end
-    
+   
     return bestTarget
 end
-
 local function Fire()
     Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
     task.wait(0.005)
     Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 end
-
+local function TweenToPosition(targetPos: Vector3, speed: number)
+    local root = LocalPlayer.Character.HumanoidRootPart
+    local distance = (root.Position - targetPos).Magnitude
+    local time = distance / speed
+    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    local tween = Services.TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(targetPos)})
+    tween:Play()
+    return tween
+end
 -- [LAYER 4] UI IMPLEMENTATION
 local Window = Fluent:CreateWindow({
     Title = "DinoPVP - BETA",
@@ -217,21 +214,21 @@ local Window = Fluent:CreateWindow({
     Theme = "Darker",
     MinimizeKey = Enum.KeyCode.RightControl
 })
-
 local Tabs = {
     Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "crosshair" }),
     Visuals = Window:AddTab({ Title = "Visuals (ESP)", Icon = "eye" }),
     Combat = Window:AddTab({ Title = "Combat", Icon = "swords" }),
     Movement = Window:AddTab({ Title = "Movement", Icon = "move" }),
+    Teleport = Window:AddTab({ Title = "Teleport", Icon = "move" }),
+    Legit = Window:AddTab({ Title = "Legit", Icon = "lock" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "box" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
-
 -- [[ AIMBOT TAB ]]
 local AimbotSection = Tabs.Aimbot:AddSection("Aimbot Settings")
 AimbotSection:AddToggle("EnableAimbot", {
     Title = "Enable Aimbot",
-    Description = "Automatically aim at closest enemy",
+    Description = "Automatically aim at nearest enemy",
     Default = false,
     Callback = function(v) Config.EnableAimbot = v end
 })
@@ -253,7 +250,12 @@ AimbotSection:AddToggle("RotateCharacter", {
     Default = true,
     Callback = function(v) Config.RotateCharacterToTarget = v end
 })
-
+AimbotSection:AddToggle("AimCursor", {
+    Title = "Aim Cursor",
+    Description = "Move mouse to target position",
+    Default = false,
+    Callback = function(v) Config.AimCursor = v end
+})
 local AdvancedAimbot = Tabs.Aimbot:AddSection("Advanced Settings")
 AdvancedAimbot:AddToggle("WallCheck", {
     Title = "Wall Check",
@@ -265,23 +267,6 @@ AdvancedAimbot:AddToggle("TeamCheck", {
     Default = true,
     Callback = function(v) Config.TeamCheck = v end
 })
-AdvancedAimbot:AddToggle("ShowFOV", {
-    Title = "Show FOV Circle",
-    Default = false,
-    Callback = function(v)
-        Config.ShowFOV = v
-        FOVCircle.Visible = v
-    end
-})
-AdvancedAimbot:AddSlider("FOVRadius", {
-    Title = "FOV Radius",
-    Min = 20, Max = 800, Default = 150, Rounding = 0,
-    Callback = function(v)
-        Config.FOVRadius = v
-        FOVCircle.Radius = v
-    end
-})
-
 -- [[ VISUALS TAB ]]
 local ESPSection = Tabs.Visuals:AddSection("ESP Settings")
 ESPSection:AddToggle("EnableESP", {
@@ -309,7 +294,6 @@ ESPSection:AddToggle("ShowHealthBar", {
     Default = false,
     Callback = function(v) Config.ShowHealthBar = v end
 })
-
 local HighlightSection = Tabs.Visuals:AddSection("Highlight ESP")
 HighlightSection:AddToggle("EnableHighlight", {
     Title = "Enable Highlight",
@@ -326,7 +310,6 @@ HighlightSection:AddColorpicker("HighlightOutlineColor", {
     Default = Color3.fromRGB(255, 255, 255),
     Callback = function(v) Config.HighlightOutlineColor = v end
 })
-
 -- [[ COMBAT TAB ]]
 local CombatSection = Tabs.Combat:AddSection("Combat Tools")
 CombatSection:AddToggle("EnableKillAura", {
@@ -346,7 +329,6 @@ CombatSection:AddToggle("TriggerBot", {
     Default = false,
     Callback = function(v) Config.TriggerBot = v end
 })
-
 local HitboxSection = Tabs.Combat:AddSection("Hitbox Expander")
 HitboxSection:AddToggle("ExpandHitbox", {
     Title = "Enable Hitbox Expander",
@@ -358,7 +340,11 @@ HitboxSection:AddSlider("HitboxSize", {
     Min = 2, Max = 30, Default = 10, Rounding = 0,
     Callback = function(v) Config.HitboxSize = v end
 })
-
+HitboxSection:AddSlider("Reach", {
+    Title = "Reach",
+    Min = 5, Max = 50, Default = 15, Rounding = 0,
+    Callback = function(v) Config.Reach = v end
+})
 -- [[ MOVEMENT TAB ]]
 local MovementSection = Tabs.Movement:AddSection("Character Mods")
 MovementSection:AddToggle("Fly", {
@@ -391,7 +377,51 @@ MovementSection:AddToggle("InfiniteJump", {
     Default = false,
     Callback = function(v) Config.InfiniteJump = v end
 })
-
+-- [[ TELEPORT TAB ]]
+local TeleportSection = Tabs.Teleport:AddSection("Teleport Settings")
+TeleportSection:AddToggle("EnableTeleport", {
+    Title = "Enable Teleport",
+    Default = false,
+    Callback = function(v) Config.EnableTeleport = v end
+})
+TeleportSection:AddDropdown("TeleportTarget", {
+    Title = "Select Target",
+    Values = {}, -- Will be populated dynamically
+    Default = "",
+    Callback = function(v) Config.TeleportTarget = v end
+})
+TeleportSection:AddToggle("TeleportLoop", {
+    Title = "Loop Teleport",
+    Default = false,
+    Callback = function(v) Config.TeleportLoop = v end
+})
+TeleportSection:AddSlider("TeleportSpeed", {
+    Title = "Tween Speed",
+    Min = 50, Max = 500, Default = 100, Rounding = 0,
+    Callback = function(v) Config.TeleportSpeed = v end
+})
+-- [[ LEGIT TAB ]]
+local LegitSection = Tabs.Legit:AddSection("Legit Features")
+LegitSection:AddToggle("EnableLegitAimbot", {
+    Title = "Legit Aimbot",
+    Default = false,
+    Callback = function(v) Config.EnableLegitAimbot = v end
+})
+LegitSection:AddSlider("LegitSmoothness", {
+    Title = "Legit Smoothness",
+    Min = 0.3, Max = 1, Default = 0.5, Rounding = 2,
+    Callback = function(v) Config.LegitSmoothness = v end
+})
+LegitSection:AddToggle("EnableLegitTween", {
+    Title = "Legit Tween",
+    Default = false,
+    Callback = function(v) Config.EnableLegitTween = v end
+})
+LegitSection:AddSlider("LegitTweenSpeed", {
+    Title = "Legit Tween Speed",
+    Min = 20, Max = 100, Default = 50, Rounding = 0,
+    Callback = function(v) Config.LegitTweenSpeed = v end
+})
 -- [[ MISC TAB ]]
 local MiscSection = Tabs.Misc:AddSection("System Tools")
 MiscSection:AddToggle("FPSBoost", {
@@ -427,7 +457,17 @@ MiscSection:AddToggle("Fullbright", {
         end
     end
 })
-
+local SafetySection = Tabs.Misc:AddSection("Safety")
+SafetySection:AddToggle("EnableSafety", {
+    Title = "Auto Escape",
+    Default = false,
+    Callback = function(v) Config.EnableSafety = v end
+})
+SafetySection:AddSlider("SafetyHealth", {
+    Title = "Escape Health %",
+    Min = 10, Max = 50, Default = 30, Rounding = 0,
+    Callback = function(v) Config.SafetyHealth = v end
+})
 -- [[ SETTINGS TAB ]]
 local SecuritySection = Tabs.Settings:AddSection("Security & Management")
 SecuritySection:AddToggle("AntiKick", {
@@ -446,7 +486,6 @@ SecuritySection:AddButton({
     Description = "Disable script, remove UI & clean up",
     Callback = function()
         Window:Destroy()
-        FOVCircle:Remove()
         for _, espData in pairs(ESPStorage) do
             for _, obj in pairs(espData) do
                 if typeof(obj) == "Instance" then
@@ -458,11 +497,10 @@ SecuritySection:AddButton({
         end
     end
 })
-
 -- [LAYER 4] EVENT HANDLING & MAIN LOOPS
 local function AddESP(player: Player)
     if ESPStorage[player] then return end
-    
+   
     ESPStorage[player] = {
         Box = CreateDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(255, 0, 0), Filled = false, Visible = false}),
         Tracer = CreateDrawing("Line", {Thickness = 1.5, Color = Color3.fromRGB(255, 0, 0), Visible = false}),
@@ -472,7 +510,6 @@ local function AddESP(player: Player)
         Highlight = nil
     }
 end
-
 local function RemoveESP(player: Player)
     if ESPStorage[player] then
         for _, obj in pairs(ESPStorage[player]) do
@@ -485,7 +522,6 @@ local function RemoveESP(player: Player)
         ESPStorage[player] = nil
     end
 end
-
 local function UpdateESP()
     for player, esp in pairs(ESPStorage) do
         if Config.EnableESP and IsValidTarget(player) then
@@ -493,14 +529,14 @@ local function UpdateESP()
             local root = char:FindFirstChild("HumanoidRootPart")
             local humanoid = char:FindFirstChild("Humanoid")
             local head = char:FindFirstChild("Head")
-            
+           
             if root and humanoid and head then
                 local topPos = head.Position + Vector3.new(0, 1, 0)
                 local bottomPos = root.Position - Vector3.new(0, 3, 0)
-                
+               
                 local top, onScreenTop = CurrentCamera:WorldToViewportPoint(topPos)
                 local bottom, onScreenBottom = CurrentCamera:WorldToViewportPoint(bottomPos)
-                
+               
                 if onScreenTop and onScreenBottom then
                     local height = math.abs(top.Y - bottom.Y)
                     local width = height / 2
@@ -510,7 +546,7 @@ local function UpdateESP()
                     local size = Vector2.new(width, height)
                     local centerX = posX + width / 2
                     local bottomY = posY + height
-                    
+                   
                     -- Box
                     if Config.ShowBox then
                         esp.Box.Visible = true
@@ -519,7 +555,7 @@ local function UpdateESP()
                     else
                         esp.Box.Visible = false
                     end
-                    
+                   
                     -- Tracer
                     if Config.ShowTracer then
                         esp.Tracer.Visible = true
@@ -528,7 +564,7 @@ local function UpdateESP()
                     else
                         esp.Tracer.Visible = false
                     end
-                    
+                   
                     -- Name
                     if Config.ShowName then
                         esp.Name.Visible = true
@@ -537,20 +573,20 @@ local function UpdateESP()
                     else
                         esp.Name.Visible = false
                     end
-                    
+                   
                     -- Health Bar
                     if Config.ShowHealthBar then
                         esp.HealthBarBorder.Visible = true
                         esp.HealthBarFill.Visible = true
-                        
+                       
                         local barWidth = 2
                         local offset = 4
                         local healthPct = humanoid.Health / humanoid.MaxHealth
                         local barHeight = height * healthPct
-                        
+                       
                         esp.HealthBarBorder.Position = Vector2.new(posX - offset - barWidth, posY)
                         esp.HealthBarBorder.Size = Vector2.new(barWidth, height)
-                        
+                       
                         esp.HealthBarFill.Position = Vector2.new(posX - offset - barWidth, posY + (height - barHeight))
                         esp.HealthBarFill.Size = Vector2.new(barWidth, barHeight)
                         esp.HealthBarFill.Color = Color3.fromHSV(healthPct * 0.3, 1, 1)
@@ -559,11 +595,11 @@ local function UpdateESP()
                         esp.HealthBarFill.Visible = false
                     end
                 else
-                    for k, obj in pairs(esp) do 
-                        if k ~= "Highlight" then obj.Visible = false end 
+                    for k, obj in pairs(esp) do
+                        if k ~= "Highlight" then obj.Visible = false end
                     end
                 end
-                
+               
                 -- Highlight
                 if Config.EnableHighlight then
                     if not esp.Highlight then
@@ -580,51 +616,74 @@ local function UpdateESP()
                     esp.Highlight = nil
                 end
             else
-                for k, obj in pairs(esp) do 
-                    if k == "Highlight" and obj then 
-                        obj:Destroy() 
-                    elseif k ~= "Highlight" then 
-                        obj.Visible = false 
-                    end 
+                for k, obj in pairs(esp) do
+                    if k == "Highlight" and obj then
+                        obj:Destroy()
+                    elseif k ~= "Highlight" then
+                        obj.Visible = false
+                    end
                 end
                 esp.Highlight = nil
             end
         else
-            for k, obj in pairs(esp) do 
-                if k == "Highlight" and obj then 
-                    obj:Destroy() 
-                elseif k ~= "Highlight" then 
-                    obj.Visible = false 
-                end 
+            for k, obj in pairs(esp) do
+                if k == "Highlight" and obj then
+                    obj:Destroy()
+                elseif k ~= "Highlight" then
+                    obj.Visible = false
+                end
             end
             esp.Highlight = nil
         end
     end
 end
-
+-- Dynamic player list for teleport
+local function UpdatePlayerList()
+    local players = {}
+    for _, player in ipairs(Services.Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(players, player.Name)
+        end
+    end
+    Tabs.Teleport.Elements.TeleportTarget.Values = players
+    Tabs.Teleport.Elements.TeleportTarget:BuildDropdownList()
+end
+task.spawn(function()
+    while true do
+        UpdatePlayerList()
+        task.wait(5)
+    end
+end)
 Services.RunService.RenderStepped:Connect(function()
-    FOVCircle.Position = Services.UserInputService:GetMouseLocation()
     UpdateESP()
-    
-    if Config.EnableAimbot then
-        local target = GetClosestPlayer()
+   
+    if Config.EnableAimbot or Config.EnableLegitAimbot then
+        local smoothness = Config.EnableLegitAimbot and Config.LegitSmoothness or Config.Smoothness
+        local target = GetNearestPlayer()
         if target and target.Character and target.Character:FindFirstChild(Config.AimPart) then
             local targetPos = target.Character[Config.AimPart].Position
             local currentCFrame = CurrentCamera.CFrame
             local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
-            
-            if Config.Smoothness <= 0.05 then
+           
+            if smoothness <= 0.05 then
                 CurrentCamera.CFrame = targetCFrame
             else
-                CurrentCamera.CFrame = currentCFrame:Lerp(targetCFrame, 1 - Config.Smoothness)
+                CurrentCamera.CFrame = currentCFrame:Lerp(targetCFrame, 1 - smoothness)
             end
-            
+           
             if Config.RotateCharacterToTarget and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local root = LocalPlayer.Character.HumanoidRootPart
                 local lookDir = Vector3.new(targetPos.X, root.Position.Y, targetPos.Z)
                 root.CFrame = CFrame.new(root.Position, lookDir)
             end
-            
+           
+            if Config.AimCursor then
+                local screenPos = CurrentCamera:WorldToScreenPoint(targetPos)
+                local mousePos = Services.UserInputService:GetMouseLocation()
+                local delta = Vector2.new(screenPos.X - mousePos.X, screenPos.Y - mousePos.Y)
+                Services.VirtualInputManager:SendMouseMoveEvent(delta.X, delta.Y, game)
+            end
+           
             if Config.TriggerBot then
                 local targetUnderMouse = Mouse.Target
                 if targetUnderMouse and targetUnderMouse:IsDescendantOf(target.Character) then
@@ -634,15 +693,14 @@ Services.RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
 Services.RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    
+   
     local root = char.HumanoidRootPart
     local humanoid = char:FindFirstChild("Humanoid")
-    
-    -- Hitbox Expander
+   
+    -- Hitbox Expander & Reach
     if Config.ExpandHitbox then
         for _, player in pairs(Services.Players:GetPlayers()) do
             if IsValidTarget(player) then
@@ -665,43 +723,43 @@ Services.RunService.Heartbeat:Connect(function()
             end
         end
     end
-    
-    -- Kill Aura
+   
+    -- Kill Aura with Reach
     if Config.EnableKillAura then
         for _, player in pairs(Services.Players:GetPlayers()) do
             if IsValidTarget(player) then
                 local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                if targetRoot and (root.Position - targetRoot.Position).Magnitude <= Config.AuraRange then
+                if targetRoot and (root.Position - targetRoot.Position).Magnitude <= Config.Reach then
                     root.CFrame = CFrame.new(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
                     Fire()
                 end
             end
         end
     end
-    
+   
     -- Fly
     if Config.Fly then
         local velocity = root:FindFirstChild("DinoFlyVelocity") or Instance.new("BodyVelocity")
         velocity.Name = "DinoFlyVelocity"
         velocity.Parent = root
         velocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        
+       
         local camCFrame = CurrentCamera.CFrame
         local velocityVector = Vector3.new()
-        
+       
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then velocityVector = velocityVector + camCFrame.LookVector end
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then velocityVector = velocityVector - camCFrame.LookVector end
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then velocityVector = velocityVector - camCFrame.RightVector end
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then velocityVector = velocityVector + camCFrame.RightVector end
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then velocityVector = velocityVector + Vector3.new(0, 1, 0) end
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then velocityVector = velocityVector - Vector3.new(0, 1, 0) end
-        
+       
         velocity.Velocity = velocityVector * Config.FlySpeed
     else
         local velocity = root:FindFirstChild("DinoFlyVelocity")
         if velocity then velocity:Destroy() end
     end
-    
+   
     -- Noclip
     if Config.Noclip then
         for _, part in pairs(char:GetDescendants()) do
@@ -710,28 +768,43 @@ Services.RunService.Heartbeat:Connect(function()
             end
         end
     end
-    
+   
     -- WalkSpeed & JumpPower
     if humanoid then
         if Config.WalkSpeed > 16 then humanoid.WalkSpeed = Config.WalkSpeed end
         if Config.JumpPower > 50 then humanoid.JumpPower = Config.JumpPower end
     end
+   
+    -- Safety
+    if Config.EnableSafety and humanoid and humanoid.Health / humanoid.MaxHealth * 100 < Config.SafetyHealth then
+        local escapePos = root.Position + Vector3.new(math.random(-Config.EscapeDistance, Config.EscapeDistance), 0, math.random(-Config.EscapeDistance, Config.EscapeDistance))
+        TweenToPosition(escapePos, Config.TeleportSpeed)
+    end
+   
+    -- Teleport & Legit Tween
+    local tweenSpeed = Config.EnableLegitTween and Config.LegitTweenSpeed or Config.TeleportSpeed
+    if (Config.EnableTeleport or Config.EnableLegitTween) and Config.TeleportTarget ~= "" then
+        local targetPlayer = Services.Players:FindFirstChild(Config.TeleportTarget)
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+            TweenToPosition(targetPos, tweenSpeed)
+            if Config.TeleportLoop or Config.EnableLegitTween then
+                task.wait(0.1) -- Small delay to loop smoothly
+            end
+        end
+    end
 end)
-
 Services.Players.PlayerAdded:Connect(function(player)
     AddESP(player)
     player.CharacterAdded:Connect(function() AddESP(player) end)
 end)
-
 Services.Players.PlayerRemoving:Connect(RemoveESP)
-
 for _, player in pairs(Services.Players:GetPlayers()) do
     if player ~= LocalPlayer then
         AddESP(player)
         player.CharacterAdded:Connect(function() AddESP(player) end)
     end
 end
-
 Services.UserInputService.JumpRequest:Connect(function()
     if Config.InfiniteJump and LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -740,7 +813,6 @@ Services.UserInputService.JumpRequest:Connect(function()
         end
     end
 end)
-
 task.spawn(function()
     local success, err = pcall(function()
         local oldNamecall
@@ -758,7 +830,6 @@ task.spawn(function()
         warn("Failed to enable Anti-Kick: " .. tostring(err))
     end
 end)
-
 LocalPlayer.Idled:Connect(function()
     if Config.AntiAFK then
         local vu = game:GetService("VirtualUser")
@@ -766,14 +837,12 @@ LocalPlayer.Idled:Connect(function()
         vu:ClickButton2(Vector2.new())
     end
 end)
-
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetFolder("DinoPVP_V4_Config")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 Window:SelectTab(1)
-
 Fluent:Notify({
     Title = "DinoDEV",
     Content = "Chúc Bạn Chơi Game Vui Vẻ.",
