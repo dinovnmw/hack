@@ -229,13 +229,23 @@ local function Fire()
     Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
 end
 local function TweenToPosition(targetPos: Vector3, speed: number)
-    local root = LocalPlayer.Character.HumanoidRootPart
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = char.HumanoidRootPart
     local distance = (root.Position - targetPos).Magnitude
-    local time = distance / speed
-    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-    local tween = Services.TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(targetPos)})
-    tween:Play()
-    return tween
+    local duration = distance / speed
+    
+    -- Dừng các Tween cũ nếu đang chạy để tránh giật lag
+    if _G.CurrentTeleportTween then
+        _G.CurrentTeleportTween:Cancel()
+    end
+
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    _G.CurrentTeleportTween = Services.TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(targetPos)})
+    _G.CurrentTeleportTween:Play()
+    
+    return _G.CurrentTeleportTween
 end
 -- New Functions Logic
 local function AutoParryLogic()
@@ -474,27 +484,54 @@ MovementSection:AddToggle("InfiniteJump", {
 })
 -- [[ TELEPORT TAB ]]
 local TeleportSection = Tabs.Teleport:AddSection("Teleport Settings")
+
 TeleportSection:AddToggle("EnableTeleport", {
-    Title = "Enable Teleport",
+    Title = "Enable Teleport (Tween)",
     Default = false,
-    Callback = function(v) Config.EnableTeleport = v end
+    Callback = function(v) 
+        Config.EnableTeleport = v 
+        if not v and _G.CurrentTeleportTween then
+            _G.CurrentTeleportTween:Cancel()
+        end
+    end
 })
-TeleportSection:AddDropdown("TeleportTarget", {
-    Title = "Select Target",
-    Values = {}, -- Will be populated dynamically
+
+local TargetDropdown = TeleportSection:AddDropdown("TeleportTarget", {
+    Title = "Select Target Player",
+    Values = {},
     Default = "",
     Callback = function(v) Config.TeleportTarget = v end
 })
+
 TeleportSection:AddToggle("TeleportLoop", {
-    Title = "Loop Teleport",
+    Title = "Loop Teleport (Stay on Target)",
     Default = false,
     Callback = function(v) Config.TeleportLoop = v end
 })
+
 TeleportSection:AddSlider("TeleportSpeed", {
     Title = "Tween Speed",
-    Min = 50, Max = 500, Default = 100, Rounding = 0,
+    Min = 50, Max = 800, Default = 150, Rounding = 0,
     Callback = function(v) Config.TeleportSpeed = v end
 })
+
+-- Hàm cập nhật danh sách người chơi cho Dropdown
+local function UpdatePlayerList()
+    local players = {}
+    for _, player in ipairs(Services.Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(players, player.Name)
+        end
+    end
+    TargetDropdown:SetValues(players)
+end
+
+-- Tự động cập nhật danh sách mỗi 5 giây
+task.spawn(function()
+    while task.wait(5) do
+        UpdatePlayerList()
+    end
+end)
 -- [[ LEGIT TAB ]]
 local LegitSection = Tabs.Legit:AddSection("Legit Features")
 LegitSection:AddToggle("EnableLegitAimbot", {
@@ -868,6 +905,31 @@ end)
 Services.RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    -- Logic Teleport/Tween
+    if Config.EnableTeleport and Config.TeleportTarget ~= "" then
+        local targetPlayer = Services.Players:FindFirstChild(Config.TeleportTarget)
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+            
+            -- Nếu Loop được bật hoặc chưa bắt đầu Tween
+            if Config.TeleportLoop then
+                -- Bám sát mục tiêu (Dịch chuyển tức thời hoặc Tween ngắn)
+                char.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+            else
+                -- Tween tới mục tiêu một lần
+                if not _G.TeleportingNow then
+                    _G.TeleportingNow = true
+                    local tween = TweenToPosition(targetPos, Config.TeleportSpeed)
+                    if tween then
+                        tween.Completed:Wait()
+                    end
+                    Config.EnableTeleport = false -- Tự tắt sau khi tới nơi
+                    _G.TeleportingNow = false
+                end
+            end
+        end
+    end
    
     local root = char.HumanoidRootPart
     local humanoid = char:FindFirstChild("Humanoid")
