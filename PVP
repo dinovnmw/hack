@@ -204,23 +204,24 @@ local function CanSeeTarget(targetPart: BasePart): boolean
     end
     return true
 end
-local function GetNearestPlayer()
-    local bestTarget = nil
-    local bestDist = math.huge
-   
-    for _, player in ipairs(Services.Players:GetPlayers()) do
-        if IsValidTarget(player) then
-            local char = player.Character
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                if dist < bestDist and CanSeeTarget(root) then
-                    bestDist = dist
-                    bestTarget = player
-                end
+local function GetNearestPlayerForTP()
+    local nearest = nil
+    local minDist = math.huge
+    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+    
+    if not myPos then return nil end
+
+    for _, p in ipairs(Services.Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (myPos - p.Character.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = p
             end
         end
     end
+    return nearest
+end
    
     return bestTarget
 end
@@ -500,7 +501,7 @@ TeleportSection:AddParagraph({
     Title = "Hotkeys",
     Content = "Press 'U' to switch to the next player in the server."
 })
-TeleportSection:AddDropdown("TPMode", {
+eleportSection:AddDropdown("TPMode", {
     Title = "Teleport Mode",
     Values = {"Select", "Nearest"},
     Default = "Select",
@@ -916,11 +917,10 @@ Services.RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     
-    -- GỘP CHUNG LOGIC TELEPORT VÀO MỘT KHỐI DUY NHẤT
     if Config.EnableTeleport then
         local targetPlayer = nil
         
-        -- Kiểm tra chế độ tìm mục tiêu
+        -- Kiểm tra chế độ để lấy mục tiêu
         if Config.TeleportMode == "Nearest" then
             targetPlayer = GetNearestPlayerForTP()
         else
@@ -931,16 +931,10 @@ Services.RunService.Heartbeat:Connect(function()
             local targetRP = targetPlayer.Character.HumanoidRootPart
             
             if Config.TeleportLoop then
-                -- CHẾ ĐỘ DÍNH (STICKY): Cập nhật vị trí liên tục mỗi khung hình
+                -- Chế độ dính chặt (Sticky)
                 char.HumanoidRootPart.CFrame = targetRP.CFrame * CFrame.new(0, 0, 3)
-                
-                -- Hủy tween nếu đang bay mà bật Loop giữa chừng
-                if _G.CurrentTeleportTween then 
-                    _G.CurrentTeleportTween:Cancel() 
-                    _G.TeleportingNow = false
-                end
             else
-                -- CHẾ ĐỘ BAY (TWEEN): Chỉ chạy một lần cho đến khi tới nơi
+                -- Chế độ Tween (Bay tới một lần)
                 if not _G.TeleportingNow then
                     _G.TeleportingNow = true
                     task.spawn(function()
@@ -949,7 +943,7 @@ Services.RunService.Heartbeat:Connect(function()
                             tween.Completed:Wait()
                         end
                         _G.TeleportingNow = false
-                        Config.EnableTeleport = false -- Tắt sau khi đã tới đích
+                        Config.EnableTeleport = false -- Tự tắt khi tới nơi
                     end)
                 end
             end
@@ -1126,10 +1120,9 @@ Services.UserInputService.InputBegan:Connect(function(input, gpe)
             local nextIndex = (curIndex % #players) + 1
             Config.TeleportTarget = players[nextIndex]
             
-            -- Thông báo cho người dùng
             Fluent:Notify({
-                Title = "Teleport",
-                Content = "Next Target: " .. Config.TeleportTarget,
+                Title = "Teleport Target Updated",
+                Content = "Mục tiêu hiện tại: " .. Config.TeleportTarget,
                 Duration = 2
             })
         end
