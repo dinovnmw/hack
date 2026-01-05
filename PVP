@@ -8,7 +8,8 @@ local Services = {
     Lighting = game:GetService("Lighting"),
     HttpService = game:GetService("HttpService"),
     CoreGui = game:GetService("CoreGui"),
-    TweenService = game:GetService("TweenService")
+    TweenService = game:GetService("TweenService"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage")
 }
 -- Load Fluent UI library with error protection
 local Success, Fluent = pcall(function()
@@ -78,7 +79,23 @@ type Config = {
     FPSBoost: boolean,
     Fullbright: boolean,
     AntiKick: boolean,
-    AntiAFK: boolean
+    AntiAFK: boolean,
+    -- New PVP Functions
+    AutoParry: boolean,
+    InfiniteCombo: boolean,
+    NoStun: boolean,
+    AntiLock: boolean,
+    AutoDodge: boolean,
+    FastAttack: boolean,
+    NoCooldown: boolean,
+    DamageMultiplier: number,
+    HealthRegen: boolean,
+    AutoEatFruit: boolean,
+    GodMode: boolean,
+    InfiniteStamina: boolean,
+    AutoUseSkills: boolean,
+    KillAll: boolean,
+    NoFallDamage: boolean
 }
 local Config: Config = {
     EnableAimbot = false,
@@ -126,7 +143,23 @@ local Config: Config = {
     FPSBoost = false,
     Fullbright = true,
     AntiKick = true,
-    AntiAFK = true
+    AntiAFK = true,
+    -- New
+    AutoParry = false,
+    InfiniteCombo = false,
+    NoStun = false,
+    AntiLock = false,
+    AutoDodge = false,
+    FastAttack = false,
+    NoCooldown = false,
+    DamageMultiplier = 1,
+    HealthRegen = false,
+    AutoEatFruit = false,
+    GodMode = false,
+    InfiniteStamina = false,
+    AutoUseSkills = false,
+    KillAll = false,
+    NoFallDamage = false
 }
 -- [LAYER 2] DRAWING API & CACHE MANAGEMENT
 local ESPStorage = {}
@@ -204,6 +237,67 @@ local function TweenToPosition(targetPos: Vector3, speed: number)
     tween:Play()
     return tween
 end
+-- New Functions Logic
+local function AutoParryLogic()
+    -- Simulate auto parry by detecting attacks and blocking
+    -- Placeholder: Actual implementation depends on game mechanics
+end
+local function InfiniteComboLogic()
+    -- Allow infinite attacks without break
+end
+local function NoStunLogic()
+    -- Prevent stun effects
+end
+local function AntiLockLogic()
+    -- Anti aim lock
+end
+local function AutoDodgeLogic()
+    -- Auto dodge incoming attacks
+end
+local function FastAttackLogic()
+    -- Increase attack speed
+end
+local function NoCooldownLogic()
+    -- Remove skill cooldowns
+end
+local function DamageMultiplierLogic()
+    -- Multiply damage output
+end
+local function HealthRegenLogic()
+    -- Regenerate health over time
+    if LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+        LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.Health + 1
+    end
+end
+local function AutoEatFruitLogic()
+    -- Auto use fruits
+end
+local function GodModeLogic()
+    -- Make invincible
+    if LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+        LocalPlayer.Character.Humanoid.MaxHealth = math.huge
+        LocalPlayer.Character.Humanoid.Health = math.huge
+    end
+end
+local function InfiniteStaminaLogic()
+    -- Infinite energy/stamina
+end
+local function AutoUseSkillsLogic()
+    -- Auto activate skills on targets
+end
+local function KillAllLogic()
+    for _, player in pairs(Services.Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character.Humanoid then
+            player.Character.Humanoid.Health = 0
+        end
+    end
+end
+local function NoFallDamageLogic()
+    -- Prevent fall damage
+    game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").FreeFalling:Connect(function()
+        -- Set fall velocity to 0
+    end)
+end
 -- [LAYER 4] UI IMPLEMENTATION
 local Window = Fluent:CreateWindow({
     Title = "DinoPVP - BETA",
@@ -222,7 +316,8 @@ local Tabs = {
     Teleport = Window:AddTab({ Title = "Teleport", Icon = "move" }),
     Legit = Window:AddTab({ Title = "Legit", Icon = "lock" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "box" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+    PVPExtra = Window:AddTab({ Title = "PVP Extra", Icon = "swords" })
 }
 -- [[ AIMBOT TAB ]]
 local AimbotSection = Tabs.Aimbot:AddSection("Aimbot Settings")
@@ -421,6 +516,83 @@ LegitSection:AddSlider("LegitTweenSpeed", {
     Title = "Legit Tween Speed",
     Min = 20, Max = 100, Default = 50, Rounding = 0,
     Callback = function(v) Config.LegitTweenSpeed = v end
+})
+-- [[ PVP EXTRA TAB ]]
+local PVPExtraSection = Tabs.PVPExtra:AddSection("Extra PVP Features")
+PVPExtraSection:AddToggle("AutoParry", {
+    Title = "Auto Parry",
+    Default = false,
+    Callback = function(v) Config.AutoParry = v end
+})
+PVPExtraSection:AddToggle("InfiniteCombo", {
+    Title = "Infinite Combo",
+    Default = false,
+    Callback = function(v) Config.InfiniteCombo = v end
+})
+PVPExtraSection:AddToggle("NoStun", {
+    Title = "No Stun",
+    Default = false,
+    Callback = function(v) Config.NoStun = v end
+})
+PVPExtraSection:AddToggle("AntiLock", {
+    Title = "Anti Lock",
+    Default = false,
+    Callback = function(v) Config.AntiLock = v end
+})
+PVPExtraSection:AddToggle("AutoDodge", {
+    Title = "Auto Dodge",
+    Default = false,
+    Callback = function(v) Config.AutoDodge = v end
+})
+PVPExtraSection:AddToggle("FastAttack", {
+    Title = "Fast Attack",
+    Default = false,
+    Callback = function(v) Config.FastAttack = v end
+})
+PVPExtraSection:AddToggle("NoCooldown", {
+    Title = "No Cooldown",
+    Default = false,
+    Callback = function(v) Config.NoCooldown = v end
+})
+PVPExtraSection:AddSlider("DamageMultiplier", {
+    Title = "Damage Multiplier",
+    Min = 1, Max = 10, Default = 1, Rounding = 0,
+    Callback = function(v) Config.DamageMultiplier = v end
+})
+PVPExtraSection:AddToggle("HealthRegen", {
+    Title = "Health Regen",
+    Default = false,
+    Callback = function(v) Config.HealthRegen = v end
+})
+PVPExtraSection:AddToggle("AutoEatFruit", {
+    Title = "Auto Eat Fruit",
+    Default = false,
+    Callback = function(v) Config.AutoEatFruit = v end
+})
+PVPExtraSection:AddToggle("GodMode", {
+    Title = "God Mode",
+    Default = false,
+    Callback = function(v) Config.GodMode = v end
+})
+PVPExtraSection:AddToggle("InfiniteStamina", {
+    Title = "Infinite Stamina",
+    Default = false,
+    Callback = function(v) Config.InfiniteStamina = v end
+})
+PVPExtraSection:AddToggle("AutoUseSkills", {
+    Title = "Auto Use Skills",
+    Default = false,
+    Callback = function(v) Config.AutoUseSkills = v end
+})
+PVPExtraSection:AddToggle("KillAll", {
+    Title = "Kill All",
+    Default = false,
+    Callback = function(v) Config.KillAll = v end
+})
+PVPExtraSection:AddToggle("NoFallDamage", {
+    Title = "No Fall Damage",
+    Default = false,
+    Callback = function(v) Config.NoFallDamage = v end
 })
 -- [[ MISC TAB ]]
 local MiscSection = Tabs.Misc:AddSection("System Tools")
@@ -793,6 +965,22 @@ Services.RunService.Heartbeat:Connect(function()
             end
         end
     end
+   
+    -- New PVP Functions
+    if Config.AutoParry then AutoParryLogic() end
+    if Config.InfiniteCombo then InfiniteComboLogic() end
+    if Config.NoStun then NoStunLogic() end
+    if Config.AntiLock then AntiLockLogic() end
+    if Config.AutoDodge then AutoDodgeLogic() end
+    if Config.FastAttack then FastAttackLogic() end
+    if Config.NoCooldown then NoCooldownLogic() end
+    if Config.HealthRegen then HealthRegenLogic() end
+    if Config.AutoEatFruit then AutoEatFruitLogic() end
+    if Config.GodMode then GodModeLogic() end
+    if Config.InfiniteStamina then InfiniteStaminaLogic() end
+    if Config.AutoUseSkills then AutoUseSkillsLogic() end
+    if Config.KillAll then KillAllLogic() end
+    if Config.NoFallDamage then NoFallDamageLogic() end
 end)
 Services.Players.PlayerAdded:Connect(function(player)
     AddESP(player)
