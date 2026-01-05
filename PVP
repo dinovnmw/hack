@@ -133,6 +133,7 @@ local Config: Config = {
     TeleportTarget = "",
     TeleportLoop = false,
     TeleportSpeed = 100,
+    TeleportMode = "Select",
     EnableSafety = false,
     SafetyHealth = 30,
     EscapeDistance = 1000,
@@ -495,7 +496,16 @@ TeleportSection:AddToggle("EnableTeleport", {
         end
     end
 })
-
+TeleportSection:AddParagraph({
+    Title = "Hotkeys",
+    Content = "Press 'U' to switch to the next player in the server."
+})
+TeleportSection:AddDropdown("TPMode", {
+    Title = "Teleport Mode",
+    Values = {"Select", "Nearest"},
+    Default = "Select",
+    Callback = function(v) Config.TeleportMode = v end
+})
 local TargetDropdown = TeleportSection:AddDropdown("TeleportTarget", {
     Title = "Select Target Player",
     Values = {},
@@ -906,26 +916,41 @@ Services.RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     
-    -- Logic Teleport/Tween
-    if Config.EnableTeleport and Config.TeleportTarget ~= "" then
-        local targetPlayer = Services.Players:FindFirstChild(Config.TeleportTarget)
+    -- GỘP CHUNG LOGIC TELEPORT VÀO MỘT KHỐI DUY NHẤT
+    if Config.EnableTeleport then
+        local targetPlayer = nil
+        
+        -- Kiểm tra chế độ tìm mục tiêu
+        if Config.TeleportMode == "Nearest" then
+            targetPlayer = GetNearestPlayerForTP()
+        else
+            targetPlayer = Services.Players:FindFirstChild(Config.TeleportTarget)
+        end
+
         if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+            local targetRP = targetPlayer.Character.HumanoidRootPart
             
-            -- Nếu Loop được bật hoặc chưa bắt đầu Tween
             if Config.TeleportLoop then
-                -- Bám sát mục tiêu (Dịch chuyển tức thời hoặc Tween ngắn)
-                char.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                -- CHẾ ĐỘ DÍNH (STICKY): Cập nhật vị trí liên tục mỗi khung hình
+                char.HumanoidRootPart.CFrame = targetRP.CFrame * CFrame.new(0, 0, 3)
+                
+                -- Hủy tween nếu đang bay mà bật Loop giữa chừng
+                if _G.CurrentTeleportTween then 
+                    _G.CurrentTeleportTween:Cancel() 
+                    _G.TeleportingNow = false
+                end
             else
-                -- Tween tới mục tiêu một lần
+                -- CHẾ ĐỘ BAY (TWEEN): Chỉ chạy một lần cho đến khi tới nơi
                 if not _G.TeleportingNow then
                     _G.TeleportingNow = true
-                    local tween = TweenToPosition(targetPos, Config.TeleportSpeed)
-                    if tween then
-                        tween.Completed:Wait()
-                    end
-                    Config.EnableTeleport = false -- Tự tắt sau khi tới nơi
-                    _G.TeleportingNow = false
+                    task.spawn(function()
+                        local tween = TweenToPosition(targetRP.Position, Config.TeleportSpeed)
+                        if tween then
+                            tween.Completed:Wait()
+                        end
+                        _G.TeleportingNow = false
+                        Config.EnableTeleport = false -- Tắt sau khi đã tới đích
+                    end)
                 end
             end
         end
@@ -1085,6 +1110,29 @@ LocalPlayer.Idled:Connect(function()
         local vu = game:GetService("VirtualUser")
         vu:CaptureController()
         vu:ClickButton2(Vector2.new())
+    end
+end)
+-- [[ 4. XỬ LÝ PHÍM U (Bỏ ở cuối Script) ]]
+Services.UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.U then
+        local players = {}
+        for _, p in ipairs(Services.Players:GetPlayers()) do
+            if p ~= LocalPlayer then table.insert(players, p.Name) end
+        end
+        
+        if #players > 0 then
+            local curIndex = table.find(players, Config.TeleportTarget) or 0
+            local nextIndex = (curIndex % #players) + 1
+            Config.TeleportTarget = players[nextIndex]
+            
+            -- Thông báo cho người dùng
+            Fluent:Notify({
+                Title = "Teleport",
+                Content = "Next Target: " .. Config.TeleportTarget,
+                Duration = 2
+            })
+        end
     end
 end)
 SaveManager:SetLibrary(Fluent)
