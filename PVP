@@ -364,7 +364,7 @@ AimbotSection:AddToggle("AimCursor", {
 local AdvancedAimbot = Tabs.Aimbot:AddSection("Advanced Settings")
 AdvancedAimbot:AddToggle("WallCheck", {
     Title = "Wall Check",
-    Default = true,
+    Default = false,
     Callback = function(v) Config.WallCheck = v end
 })
 AdvancedAimbot:AddToggle("TeamCheck", {
