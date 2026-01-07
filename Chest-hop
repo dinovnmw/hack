@@ -1,3 +1,4 @@
+--// This file was created by XHider https://discord.com/invite/E2N7w35zkt
 
 local q = game.Players.LocalPlayer;
 local U = game:GetService("UserInputService");
@@ -32,7 +33,7 @@ x.CornerRadius = UDim.new(0, 30);
 x.Parent = l;
 local C = Instance.new("UIStroke");
 C.Thickness = 3;
-C.Color = Color3.fromRGB(200, 0, 255);
+C.Color = Color3.fromRGB(255, 255, 255);
 C.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
 C.Parent = l;
 local X = Instance.new("ImageLabel");
@@ -40,19 +41,19 @@ X.Size = UDim2.new(1.5, 0, 2.5, 0);
 X.Position = UDim2.new(-0.25, 0, -0.75, 0);
 X.BackgroundTransparency = 1;
 X.Image = "rbxassetid://4996891970";
-X.ImageColor3 = Color3.fromRGB(200, 0, 255);
+X.ImageColor3 = Color3.fromRGB(255, 255, 255);
 X.ImageTransparency = .5;
 X.ZIndex = -1;
 X.Parent = l;
 local g = Instance.new("UIGradient");
-g.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 0, 50)), ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 0, 30)) });
+g.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)), ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 10)) });
 g.Rotation = 45;
 g.Parent = l;
 local E = Instance.new("TextLabel");
 E.Size = UDim2.new(1, 0, 1, 0);
 E.BackgroundTransparency = 1;
 E.Text = "DinoHub - Auto Collect Chest";
-E.TextColor3 = Color3.fromRGB(220, 0, 255);
+E.TextColor3 = Color3.fromRGB(255, 255, 255);
 E.Font = Enum.Font.GothamBlack;
 E.TextScaled = true;
 E.TextStrokeTransparency = .4;
@@ -79,8 +80,8 @@ local function Z(q)
 	end;
 	local U = Instance.new("Highlight");
 	U.Name = "PurpleAura";
-	U.FillColor = Color3.fromRGB(200, 0, 255);
-	U.OutlineColor = Color3.fromRGB(220, 100, 255);
+	U.FillColor = Color3.fromRGB(255, 255, 255);
+	U.OutlineColor = Color3.fromRGB(220, 220, 220);
 	U.FillTransparency = .2;
 	U.OutlineTransparency = 0;
 	U.Parent = q;
@@ -372,7 +373,7 @@ local function D(q, U, f, i)
 	B.AnchorPoint = Vector2.new(0, 0);
 	B.BackgroundTransparency = 1;
 	B.Text = q;
-	B.TextColor3 = Color3.fromRGB(200, 0, 255);
+	B.TextColor3 = Color3.fromRGB(255, 255, 255);
 	B.Font = Enum.Font.GothamBold;
 	B.TextSize = 14;
 	B.Parent = a;
@@ -388,7 +389,7 @@ local function D(q, U, f, i)
 	local x = f;
 	local function C()
 		if x then
-			l.BackgroundColor3 = Color3.fromRGB(200, 0, 255);
+			l.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
 			l.Text = "\226\156\147";
 		else
 			l.BackgroundColor3 = Color3.fromRGB(120, 120, 120);
