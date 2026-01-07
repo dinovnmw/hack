@@ -1,4 +1,3 @@
---// This file was created by XHider https://discord.com/invite/E2N7w35zkt
 
 local q = game.Players.LocalPlayer;
 local U = game:GetService("UserInputService");
