@@ -10,7 +10,7 @@ local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local API_URL = "https://dinokey.x10.mx/key.php?api=verify"
-local MAIN_URL = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP"
+local MAIN_URL = "https://raw.githubusercontent.com/dinovnmw/hack/main/Chest-hop"
 local CACHE_FILE = "dino_key_cache.json"
 
 local expireTime = nil
@@ -51,7 +51,7 @@ createTween(mainFrame, {0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0.2, 0)
 title.BackgroundTransparency = 1
-title.Text = "DINO SYSTEM"
+title.Text = "DINO SYSTEM - CHEST HOP"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 22
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
