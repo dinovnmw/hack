@@ -92,7 +92,7 @@ local function CreateLoadingUI()
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Size = UDim2.new(1, 0, 1, 0)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "DinoHub - Auto Collect Chest V2.2"
+    TitleLabel.Text = "DinoHub - Auto Collect Chest"
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleLabel.Font = Enum.Font.GothamBlack
     TitleLabel.TextScaled = true
