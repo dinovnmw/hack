@@ -1,878 +1,455 @@
--- ============================================
--- DinoHub - Auto Collect Chest System V2.2
--- Removed Reset, Added No Gravity, Menu Displays
--- ============================================
+--// This file was created by XHider https://discord.com/invite/E2N7w35zkt
+-- Upgraded: Fixed UI visibility/animation issues, improved tween smoothness, optimized nearest chest collection with distance checks.
 
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+task.spawn(function()
+    while task.wait(1) do
+        if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+            player.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+local TS = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
-local PlaceId = game.PlaceId
-
--- ============================================
--- Configuration Variables
--- ============================================
-local Config = {
-    AutoJump = false,
-    ChestCollectionRadius = 1000,
-    MaxChestsPerCycle = 5,
-    TweenSpeed = 200,
-    TweenEnabled = true,
-    NoclipEnabled = true,
-    InvisibleEnabled = false,
-    ClearMapEnabled = false,
-    CollectionDelay = 0.05,
-    SmartPathfinding = true,
-    AutoRejoin = true,
-    ChestPriority = "nearest",
-    NoGravityEnabled = true,
-    -- Server Hop Settings
-    MaxServerCapacity = 0.7,
-    PreferLowPopulation = true,
-    MinPlayers = 0,
-    MaxPlayers = 999
-}
-
--- ============================================
--- UI System - Loading Screen
--- ============================================
-local function CreateLoadingUI()
-    if CoreGui:FindFirstChild("HNC_Purple_UI") then
-        CoreGui.HNC_Purple_UI:Destroy()
-    end
-    
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "HNC_Purple_UI"
-    ScreenGui.IgnoreGuiInset = true
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = CoreGui
-    
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0.5, 0, 0.15, 0)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.15, 0)
-    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
-    MainFrame.BackgroundTransparency = 1
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Parent = ScreenGui
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 30)
-    Corner.Parent = MainFrame
-    
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Thickness = 0
-    Stroke.Color = Color3.fromRGB(255, 255, 255)
-    Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    Stroke.Parent = MainFrame
-    
-    local BackgroundImage = Instance.new("ImageLabel")
-    BackgroundImage.Size = UDim2.new(1.5, 0, 2.5, 0)
-    BackgroundImage.Position = UDim2.new(-0.25, 0, -0.75, 0)
-    BackgroundImage.BackgroundTransparency = 1
-    BackgroundImage.Image = "rbxassetid://4996891970"
-    BackgroundImage.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    BackgroundImage.ImageTransparency = 1
-    BackgroundImage.ZIndex = -1
-    BackgroundImage.Parent = MainFrame
-    
-    local Gradient = Instance.new("UIGradient")
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 10))
-    })
-    Gradient.Rotation = 45
-    Gradient.Parent = MainFrame
-    
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(1, 0, 1, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "DinoHub - Auto Collect Chest"
-    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.Font = Enum.Font.GothamBlack
-    TitleLabel.TextScaled = true
-    TitleLabel.TextStrokeTransparency = 0.4
-    TitleLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    TitleLabel.TextTransparency = 1
-    TitleLabel.Parent = MainFrame
-    
-    MainFrame.Visible = true
-    MainFrame.Size = UDim2.new(0.25, 0, 0.075, 0)
-    
-    TweenService:Create(MainFrame, TweenInfo.new(1.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-        BackgroundTransparency = 0.2,
-        Size = UDim2.new(0.5, 0, 0.15, 0)
-    }):Play()
-    
-    TweenService:Create(TitleLabel, TweenInfo.new(1.2, Enum.EasingStyle.Quint), {
-        TextTransparency = 0
-    }):Play()
-    
-    TweenService:Create(Stroke, TweenInfo.new(1.2, Enum.EasingStyle.Quint), {
-        Thickness = 3
-    }):Play()
-    
-    TweenService:Create(BackgroundImage, TweenInfo.new(1.2, Enum.EasingStyle.Quint), {
-        ImageTransparency = 0.5
-    }):Play()
-    
-    task.wait(2)
-    ScreenGui:Destroy()
+if CoreGui:FindFirstChild("HNC_Purple_UI") then
+    CoreGui.HNC_Purple_UI:Destroy()
 end
 
--- ============================================
--- Character Effects System
--- ============================================
-local function ApplyCharacterAura(character)
-    if not character then return end
-    
-    if character:FindFirstChild("PurpleAura") then
-        character.PurpleAura:Destroy()
-    end
-    
-    local Highlight = Instance.new("Highlight")
-    Highlight.Name = "PurpleAura"
-    Highlight.FillColor = Color3.fromRGB(255, 255, 255)
-    Highlight.OutlineColor = Color3.fromRGB(220, 220, 220)
-    Highlight.FillTransparency = 0.2
-    Highlight.OutlineTransparency = 0
-    Highlight.Parent = character
-end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HNC_Purple_UI"
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
 
-local function CreateRainbowLabel(character)
-    if not character then return end
-    
-    local Head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
-    if not Head then return end
-    
-    if Head:FindFirstChild("HNC_FastAttack_Label") then
-        Head.HNC_FastAttack_Label:Destroy()
-    end
-    
-    local BillboardGui = Instance.new("BillboardGui")
-    BillboardGui.Name = "HNC_FastAttack_Label"
-    BillboardGui.Adornee = Head
-    BillboardGui.AlwaysOnTop = true
-    BillboardGui.Size = UDim2.new(0, 220, 0, 45)
-    BillboardGui.StudsOffset = Vector3.new(0, 2, 0)
-    BillboardGui.Parent = Head
-    
-    local Label = Instance.new("TextLabel")
-    Label.Name = "Label"
-    Label.Size = UDim2.new(1, 0, 1, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = "Dino Hub"
-    Label.Font = Enum.Font.SourceSansBold
-    Label.TextSize = 20
-    Label.TextStrokeTransparency = 0.5
-    Label.TextTransparency = 0
-    Label.TextScaled = false
-    Label.Parent = BillboardGui
-    
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0.5, 0, 0.15, 0)
+MainFrame.Position = UDim2.new(0.5, 0, 0.15, 0)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+MainFrame.BackgroundTransparency = 1
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.Visible = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 30)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 0
+UIStroke.Color = Color3.fromRGB(255, 255, 255)
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = MainFrame
+
+local ImageLabel = Instance.new("ImageLabel")
+ImageLabel.Size = UDim2.new(1.5, 0, 2.5, 0)
+ImageLabel.Position = UDim2.new(-0.25, 0, -0.75, 0)
+ImageLabel.BackgroundTransparency = 1
+ImageLabel.Image = "rbxassetid://4996891970"
+ImageLabel.ImageColor3 = Color3.fromRGB(255, 255, 255)
+ImageLabel.ImageTransparency = 1
+ImageLabel.ZIndex = -1
+ImageLabel.Parent = MainFrame
+
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)), ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 10))})
+UIGradient.Rotation = 45
+UIGradient.Parent = MainFrame
+
+local TextLabel = Instance.new("TextLabel")
+TextLabel.Size = UDim2.new(1, 0, 1, 0)
+TextLabel.BackgroundTransparency = 1
+TextLabel.Text = "DinoHub - Auto Collect Chest"
+TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextLabel.Font = Enum.Font.GothamBlack
+TextLabel.TextScaled = true
+TextLabel.TextStrokeTransparency = 0.4
+TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+TextLabel.TextTransparency = 1
+TextLabel.Parent = MainFrame
+
+-- Animate UI
+local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+TS:Create(MainFrame, tweenInfo, {BackgroundTransparency = 0.2, Size = UDim2.new(0.5, 0, 0.15, 0)}):Play()
+TS:Create(TextLabel, tweenInfo, {TextTransparency = 0}):Play()
+TS:Create(UIStroke, tweenInfo, {Thickness = 3}):Play()
+TS:Create(ImageLabel, tweenInfo, {ImageTransparency = 0.5}):Play()
+task.wait(2)
+
+-- Character highlight
+local function AddHighlight(char)
+    if not char then return end
+    if char:FindFirstChild("PurpleAura") then char.PurpleAura:Destroy() end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "PurpleAura"
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(220, 220, 220)
+    highlight.FillTransparency = 0.2
+    highlight.OutlineTransparency = 0
+    highlight.Parent = char
+end
+if player.Character then AddHighlight(player.Character) end
+player.CharacterAdded:Connect(function(char)
+    char:WaitForChild("HumanoidRootPart")
+    task.wait(1)
+    AddHighlight(char)
+end)
+
+-- Billboard label
+local RS = game:GetService("RunService")
+local labelText = "Dino Hub"
+local labelSize = 20
+local offset = Vector3.new(0, 2, 0)
+local hueSpeed = 1.2
+local function AddBillboard(char)
+    if not char then return end
+    local head = char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+    if not head then return end
+    if head:FindFirstChild("HNC_FastAttack_Label") then head.HNC_FastAttack_Label:Destroy() end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "HNC_FastAttack_Label"
+    billboard.Adornee = head
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 220, 0, 45)
+    billboard.StudsOffset = offset
+    billboard.Parent = head
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = labelSize
+    label.TextStrokeTransparency = 0.5
+    label.TextTransparency = 0
+    label.TextScaled = false
+    label.Parent = billboard
     local hue = 0
-    local connection
-    connection = RunService.RenderStepped:Connect(function(deltaTime)
-        hue = (hue + deltaTime * 1.2) % 1
+    local conn = RS.RenderStepped:Connect(function(delta)
+        hue = (hue + delta * hueSpeed) % 1
         local color = Color3.fromHSV(hue, 0.95, 1)
-        if Label and Label.Parent then
-            Label.TextColor3 = color
+        if label and label.Parent then
+            label.TextColor3 = color
         else
-            if connection then
-                connection:Disconnect()
-            end
+            conn:Disconnect()
         end
     end)
 end
+local function OnCharacterAdded(char)
+    if not char.Parent then char.AncestryChanged:Wait() end
+    wait(0.1)
+    AddBillboard(char)
+end
+if player.Character then OnCharacterAdded(player.Character) end
+player.CharacterAdded:Connect(OnCharacterAdded)
 
--- ============================================
--- Chest Collection System
--- ============================================
-local ChestCache = {}
-local CacheInitialized = false
-local ChestStats = {
-    Total = 0,
-    Collected = 0,
-    Failed = 0,
-    StartTime = tick()
-}
-
+-- Chest collection
 local function GetCharacter()
-    if not LocalPlayer.Character then
-        LocalPlayer.CharacterAdded:Wait()
-    end
-    LocalPlayer.Character:WaitForChild("HumanoidRootPart")
-    return LocalPlayer.Character
+    if not player.Character then player.CharacterAdded:Wait() end
+    player.Character:WaitForChild("HumanoidRootPart")
+    return player.Character
 end
 
-local function CalculateDistance(pos1, pos2)
-    return (pos1 - pos2).Magnitude
-end
-
-local function InitializeChestCache()
-    if CacheInitialized then return end
-    
-    print("[DinoHub] Initializing chest cache...")
-    CacheInitialized = true
-    ChestCache = {}
-    
-    task.spawn(function()
-        for _, descendant in pairs(workspace:GetDescendants()) do
-            if descendant.Name:find("Chest") and descendant:IsA("Part") then
-                table.insert(ChestCache, descendant)
-                ChestStats.Total = ChestStats.Total + 1
-            end
-        end
-        
-        print("[DinoHub] Found " .. #ChestCache .. " chests in workspace")
-        
-        if workspace:FindFirstChild("_WorldOrigin") then
-            local worldOrigin = workspace._WorldOrigin
-            if worldOrigin:FindFirstChild("Locations") then
-                for _, location in pairs(worldOrigin.Locations:GetDescendants()) do
-                    if location.Name:find("Chest") and location:IsA("Part") then
-                        local alreadyAdded = false
-                        for _, cached in pairs(ChestCache) do
-                            if cached == location then
-                                alreadyAdded = true
-                                break
-                            end
-                        end
-                        if not alreadyAdded then
-                            table.insert(ChestCache, location)
-                            ChestStats.Total = ChestStats.Total + 1
-                        end
-                    end
-                end
-            end
-        end
-        
-        print("[DinoHub] Total chests cached: " .. #ChestCache)
-        
-        workspace.DescendantAdded:Connect(function(descendant)
-            if descendant.Name:find("Chest") and descendant:IsA("Part") then
-                table.insert(ChestCache, descendant)
-                ChestStats.Total = ChestStats.Total + 1
-                print("[DinoHub] New chest detected! Total: " .. #ChestCache)
-            end
-        end)
+local function SortByDistance(parts)
+    local rootPos = GetCharacter().HumanoidRootPart.Position
+    table.sort(parts, function(a, b)
+        return (rootPos - a.Position).Magnitude < (rootPos - b.Position).Magnitude
     end)
 end
 
-local function RefreshChestList()
+local chests = {}
+local scanned = true
+local function ScanChests()
+    if scanned then
+        scanned = false
+        for _, desc in pairs(game:GetDescendants()) do
+            if desc.Name:find("Chest") and desc.ClassName == "Part" then
+                table.insert(chests, desc)
+            end
+        end
+    end
     local validChests = {}
-    local character = GetCharacter()
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return validChests end
-    
-    local playerPos = rootPart.Position
-    
-    local cleanCache = {}
-    for _, chest in pairs(ChestCache) do
-        if chest and chest.Parent then
-            table.insert(cleanCache, chest)
+    for _, chest in pairs(chests) do
+        if chest.Parent and chest:FindFirstChild("TouchInterest") then
+            table.insert(validChests, chest)
         end
     end
-    ChestCache = cleanCache
-    
-    for _, chest in pairs(ChestCache) do
-        if chest and chest.Parent and chest:FindFirstChild("TouchInterest") then
-            table.insert(validChests, {
-                Object = chest,
-                Distance = CalculateDistance(playerPos, chest.Position)
-            })
-        end
-    end
-    
-    table.sort(validChests, function(a, b)
-        return a.Distance < b.Distance
-    end)
-    
-    local result = {}
-    for i, data in ipairs(validChests) do
-        if i <= Config.MaxChestsPerCycle then
-            table.insert(result, data.Object)
-        end
-    end
-    
-    return result
+    SortByDistance(validChests)
+    return validChests
 end
 
--- ============================================
--- Movement & Noclip System
--- ============================================
-local function SetNoclip(enabled)
-    pcall(function()
-        local character = GetCharacter()
-        for _, part in pairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = not enabled
-            end
+local noclip = false
+local function SetNoclip(enable)
+    for _, part in pairs(GetCharacter():GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not enable
         end
-    end)
-end
-
-local function UpdateNoclip()
-    if GetCharacter() then
-        SetNoclip(Config.NoclipEnabled)
     end
 end
 
 task.spawn(function()
     while task.wait(0.1) do
-        pcall(function()
-            if Config.NoclipEnabled and GetCharacter() and GetCharacter():FindFirstChild("Humanoid") then
-                GetCharacter().Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-            end
-        end)
+        if noclip and GetCharacter() and GetCharacter():FindFirstChild("Humanoid") then
+            GetCharacter().Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        end
     end
 end)
 
-local function TweenToPosition(targetCFrame)
-    pcall(function()
-        local character = GetCharacter()
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
-        
-        local targetPos = targetCFrame.Position + Vector3.new(0, 3, 0)
-        SetNoclip(true)
-        
-        if Config.TweenEnabled then
-            local distance = (rootPart.Position - targetPos).Magnitude
-            local duration = distance / Config.TweenSpeed
-            if duration < 0.03 then duration = 0.03 end
-            
-            local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-            local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(targetPos)})
-            tween:Play()
-            tween.Completed:Wait()
-            task.wait(0.05 + math.random() * 0.05)
-        else
-            rootPart.CFrame = CFrame.new(targetPos)
-            task.wait(0.03 + math.random() * 0.05)
-        end
-        
-        SetNoclip(Config.NoclipEnabled)
-    end)
-end
-
--- ============================================
--- No Gravity System
--- ============================================
-local AntiGravityForce = nil
-
-local function UpdateNoGravity()
-    pcall(function()
-        local character = GetCharacter()
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
-        
-        if AntiGravityForce then
-            AntiGravityForce:Destroy()
-            AntiGravityForce = nil
-        end
-        
-        if Config.NoGravityEnabled then
-            AntiGravityForce = Instance.new("VectorForce")
-            AntiGravityForce.Name = "AntiGravity"
-            AntiGravityForce.Attachment0 = Instance.new("Attachment", rootPart)
-            AntiGravityForce.Force = Vector3.new(0, workspace.Gravity * character:GetMass(), 0)
-            AntiGravityForce.RelativeTo = Enum.ActuatorRelativeTo.World
-            AntiGravityForce.Parent = rootPart
-        end
-    end)
-end
-
--- ============================================
--- Server Hop System
--- ============================================
-local ServerList = {}
-local NextPageCursor = ""
-local CurrentHour = os.date("!*t").hour
-local loadSuccess = pcall(function()
-    ServerList = HttpService:JSONDecode(readfile("NotSameServers.json"))
-end)
-if not loadSuccess then
-    table.insert(ServerList, CurrentHour)
-    writefile("NotSameServers.json", HttpService:JSONEncode(ServerList))
-end
-
-local function CreateHopUI()
-    pcall(function()
-        local ScreenGui = Instance.new("ScreenGui")
-        ScreenGui.Name = "HNC_Hub_HopUI"
-        ScreenGui.ResetOnSpawn = false
-        ScreenGui.IgnoreGuiInset = true
-        ScreenGui.Parent = CoreGui
-        
-        local Frame = Instance.new("Frame")
-        Frame.Size = UDim2.new(1, 0, 1, 0)
-        Frame.BackgroundColor3 = Color3.new(0, 0, 0)
-        Frame.BorderSizePixel = 0
-        Frame.BackgroundTransparency = 0
-        Frame.Parent = ScreenGui
-        
-        local TitleLabel = Instance.new("TextLabel")
-        TitleLabel.Size = UDim2.new(1, 0, 0.2, 0)
-        TitleLabel.Position = UDim2.new(0, 0, 0.35, 0)
-        TitleLabel.BackgroundTransparency = 1
-        TitleLabel.Text = "DinoHUB - Auto Collect Chest"
-        TitleLabel.TextColor3 = Color3.new(1, 1, 1)
-        TitleLabel.Font = Enum.Font.SourceSansBold
-        TitleLabel.TextScaled = true
-        TitleLabel.Parent = Frame
-        
-        local StatusLabel = Instance.new("TextLabel")
-        StatusLabel.Size = UDim2.new(1, 0, 0.2, 0)
-        StatusLabel.Position = UDim2.new(0, 0, 0.5, 0)
-        StatusLabel.BackgroundTransparency = 1
-        StatusLabel.Text = "Hopping to new server..."
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
-        StatusLabel.Font = Enum.Font.SourceSansBold
-        StatusLabel.TextScaled = true
-        StatusLabel.Parent = Frame
-    end)
-end
-
-local function TPReturner()
-    local success = pcall(function()
-        local response
-        local url
-        
-        if NextPageCursor == "" then
-            url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        else
-            url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&cursor=" .. NextPageCursor
-        end
-        
-        response = HttpService:JSONDecode(game:HttpGet(url))
-        
-        if response.nextPageCursor and response.nextPageCursor ~= "null" then
-            NextPageCursor = response.nextPageCursor
-        end
-        
-        local validServers = {}
-        
-        for _, server in pairs(response.data) do
-            local serverId = tostring(server.id)
-            local playing = tonumber(server.playing) or 0
-            local maxPlayers = tonumber(server.maxPlayers) or 0
-            
-            if playing < maxPlayers and playing < (maxPlayers * 0.7) then
-                local alreadyVisited = false
-                
-                for _, savedServer in pairs(ServerList) do
-                    if serverId == tostring(savedServer) then
-                        alreadyVisited = true
-                        break
-                    end
-                end
-                
-                if not alreadyVisited then
-                    table.insert(validServers, {
-                        id = serverId,
-                        playing = playing,
-                        maxPlayers = maxPlayers,
-                        percentage = (playing / maxPlayers) * 100
-                    })
-                end
-            end
-        end
-        
-        table.sort(validServers, function(a, b)
-            return a.playing < b.playing
-        end)
-        
-        if #validServers > 0 then
-            if tonumber(CurrentHour) ~= tonumber(os.date("!*t").hour) then
-                pcall(function()
-                    delfile("NotSameServers.json")
-                    ServerList = {}
-                    table.insert(ServerList, os.date("!*t").hour)
-                    CurrentHour = os.date("!*t").hour
-                end)
-            end
-        end
-        
-        if #validServers > 0 then
-            local bestServer = validServers[1]
-            table.insert(ServerList, bestServer.id)
-            
-            print(string.format("[DinoHub] Hopping to server: %d/%d players (%.1f%%)", 
-                bestServer.playing, bestServer.maxPlayers, bestServer.percentage))
-            
-            pcall(function()
-                writefile("NotSameServers.json", HttpService:JSONEncode(ServerList))
-                CreateHopUI()
-                task.wait(3 + math.random(2))
-                TeleportService:TeleportToPlaceInstance(PlaceId, bestServer.id, LocalPlayer)
-            end)
-            task.wait(4)
-        else
-            print("[DinoHub] No suitable servers found, trying next page...")
-        end
-    end)
-    
-    return success
-end
-
-local function TeleportLoop()
-    task.spawn(function()
-        local attemptCount = 0
-        local maxAttempts = 10
-        
-        while task.wait(1 + math.random()) do
-            attemptCount = attemptCount + 1
-            
-            print(string.format("[DinoHub] Server hop attempt %d/%d", attemptCount, maxAttempts))
-            
-            local success = pcall(function()
-                TPReturner()
-                
-                if NextPageCursor ~= "" and NextPageCursor ~= "null" then
-                    print("[DinoHub] Checking next page of servers...")
-                    TPReturner()
-                end
-            end)
-            
-            if not success then
-                print("[DinoHub] Server hop failed, retrying...")
-            end
-            
-            if attemptCount >= maxAttempts then
-                print("[DinoHub] Max attempts reached, resetting search...")
-                NextPageCursor = ""
-                attemptCount = 0
-                task.wait(5)
-            end
-        end
-    end)
-end
-
--- ============================================
--- Main Collection Loop
--- ============================================
-local CollectionActive = false
-local ServerHopInitiated = false
-local LastChestCheckTime = 0
-local NoChestWaitTime = 0
-
-local function StartChestCollection()
-    if CollectionActive then return end
-    CollectionActive = true
-    
-    task.spawn(function()
-        print("[DinoHub] Starting chest collection...")
-        task.wait(3)
-        
-        while CollectionActive and not ServerHopInitiated do
-            local currentTime = tick()
-            
-            pcall(function()
-                local nearestChests = RefreshChestList()
-                
-                if #nearestChests > 0 then
-                    print("[DinoHub] Found " .. #nearestChests .. " nearest chests")
-                    LastChestCheckTime = currentTime
-                    NoChestWaitTime = 0
-                    
-                    for i, chest in ipairs(nearestChests) do
-                        if chest and chest.Parent and chest:FindFirstChild("TouchInterest") then
-                            print("[DinoHub] Collecting chest " .. i .. "/" .. #nearestChests)
-                            TweenToPosition(chest.CFrame)
-                            ChestStats.Collected = ChestStats.Collected + 1
-                            task.wait(0.2)
-                        end
-                    end
-                else
-                    NoChestWaitTime = NoChestWaitTime + 1
-                    print("[DinoHub] No chests found. Wait count: " .. NoChestWaitTime .. "/10")
-                    
-                    if NoChestWaitTime >= 10 then
-                        print("[DinoHub] No chests for 30 seconds, initiating server hop...")
-                        ServerHopInitiated = true
-                        CollectionActive = false
-                        task.wait(2)
-                        TeleportLoop()
-                        return
-                    end
-                    
-                    task.wait(3)
-                end
-            end)
-            
-            task.wait(Config.CollectionDelay + math.random() * 0.1)
-        end
-    end)
-end
-
--- ============================================
--- Control Panel UI (Added Stats)
--- ============================================
-local MoneyLabel
-local ChestLabel
-
-local function GetMoney()
-    pcall(function()
-        return LocalPlayer.Data.Beli.Value
-    end)
-    return 0
-end
-
-local function CreateControlPanel()
-    if CoreGui:FindFirstChild("HN_MiniUI") then
-        CoreGui.HN_MiniUI:Destroy()
+local useTween = true
+local tweenSpeed = 250  -- Upgraded speed
+local function TweenTo(pos)
+    local root = GetCharacter().HumanoidRootPart
+    local target = pos + Vector3.new(0, 3, 0)
+    SetNoclip(true)
+    if useTween then
+        local dist = (root.Position - target).Magnitude
+        local speed = tweenSpeed
+        local time = dist / speed
+        if time < 0.03 then time = 0.03 end
+        local info = TweenInfo.new(time, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)  -- Smoother easing
+        TS:Create(root, info, {CFrame = CFrame.new(target)}):Play()
+        task.wait(time + math.random() * 0.05)
+    else
+        root.CFrame = CFrame.new(target)
+        task.wait(0.03 + math.random() * 0.05)
     end
-    
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "HN_MiniUI"
-    ScreenGui.Parent = CoreGui
-    
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 200, 0, 350)
-    MainFrame.Position = UDim2.new(1, -210, 0.1, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
-    MainFrame.BackgroundTransparency = 0.5
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Parent = ScreenGui
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 10)
-    Corner.Parent = MainFrame
-    
-    local function CreateToggle(labelText, yOffset, defaultValue, callback)
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.7, 0, 0, 25)
-        Label.Position = UDim2.new(0.05, 0, 0, yOffset)
-        Label.BackgroundTransparency = 1
-        Label.Text = labelText
-        Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Label.Font = Enum.Font.GothamBold
-        Label.TextSize = 14
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = MainFrame
-        
-        local Button = Instance.new("TextButton")
-        Button.Size = UDim2.new(0, 25, 0, 25)
-        Button.Position = UDim2.new(0.8, 0, 0, yOffset)
-        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Button.TextSize = 16
-        Button.Font = Enum.Font.GothamBold
-        Button.Parent = MainFrame
-        
-        local Corner = Instance.new("UICorner", Button)
-        Corner.CornerRadius = UDim.new(1, 0)
-        
-        local state = defaultValue
-        
-        local function UpdateButton()
-            if state then
-                Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                Button.Text = "✓"
+    SetNoclip(noclip)
+end
+
+local function CollectLoop()
+    task.spawn(function()
+        while task.wait(0.05 + math.random() * 0.1) do
+            local nearChests = ScanChests()
+            if #nearChests > 0 then
+                TweenTo(nearChests[1].CFrame)  -- Collect nearest
             else
-                Button.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
-                Button.Text = ""
-            end
-        end
-        
-        UpdateButton()
-        
-        Button.MouseButton1Click:Connect(function()
-            state = not state
-            UpdateButton()
-            callback(state)
-        end)
-        
-        return function() return state end, function(newState)
-            state = newState
-            UpdateButton()
-            callback(newState)
-        end
-    end
-    
-    CreateToggle("Invisible", 10, Config.InvisibleEnabled, function(value)
-        Config.InvisibleEnabled = value
-        SetInvisible(value)
-    end)
-    
-    CreateToggle("Clear Map", 40, Config.ClearMapEnabled, function(value)
-        Config.ClearMapEnabled = value
-        ClearMapObjects(value)
-    end)
-    
-    CreateToggle("Tween Mode", 70, Config.TweenEnabled, function(value)
-        Config.TweenEnabled = value
-    end)
-    
-    CreateToggle("Noclip", 100, Config.NoclipEnabled, function(value)
-        Config.NoclipEnabled = value
-        UpdateNoclip()
-    end)
-    
-    CreateToggle("No Gravity", 130, Config.NoGravityEnabled, function(value)
-        Config.NoGravityEnabled = value
-        UpdateNoGravity()
-    end)
-    
-    -- Stats Displays
-    MoneyLabel = Instance.new("TextLabel")
-    MoneyLabel.Size = UDim2.new(1, 0, 0, 25)
-    MoneyLabel.Position = UDim2.new(0, 0, 0, 170)
-    MoneyLabel.BackgroundTransparency = 1
-    MoneyLabel.Text = "Money: 0"
-    MoneyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MoneyLabel.Font = Enum.Font.GothamBold
-    MoneyLabel.TextSize = 14
-    MoneyLabel.TextXAlignment = Enum.TextXAlignment.Left
-    MoneyLabel.Parent = MainFrame
-    
-    ChestLabel = Instance.new("TextLabel")
-    ChestLabel.Size = UDim2.new(1, 0, 0, 25)
-    ChestLabel.Position = UDim2.new(0, 0, 0, 200)
-    ChestLabel.BackgroundTransparency = 1
-    ChestLabel.Text = "Chests Collected: 0"
-    ChestLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ChestLabel.Font = Enum.Font.GothamBold
-    ChestLabel.TextSize = 14
-    ChestLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ChestLabel.Parent = MainFrame
-end
-
--- Update Stats Loop
-task.spawn(function()
-    while task.wait(1) do
-        pcall(function()
-            if ChestLabel then
-                ChestLabel.Text = "Chests Collected: " .. ChestStats.Collected
-            end
-        end)
-    end
-end)
-
--- ============================================
--- Visibility Functions
--- ============================================
-function SetInvisible(enabled)
-    pcall(function()
-        if LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") or part:IsA("Decal") then
-                    part.LocalTransparencyModifier = enabled and 1 or 0
-                end
+                TeleportLoop()
+                break
             end
         end
     end)
 end
 
-function ClearMapObjects(enabled)
-    pcall(function()
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") or obj:IsA("Decal") then
-                if not obj:IsDescendantOf(LocalPlayer.Character) then
-                    obj.LocalTransparencyModifier = enabled and 1 or 0
-                end
-            end
-        end
-    end)
-end
-
--- ============================================
--- Auto Jump System
--- ============================================
 task.spawn(function()
-    while task.wait(1) do
-        pcall(function()
-            if Config.AutoJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-                LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-        end)
-    end
-end)
-
--- ============================================
--- Team Setter
--- ============================================
-task.spawn(function()
+    local RS = game:GetService("ReplicatedStorage")
     while task.wait(5 + math.random(5)) do
         pcall(function()
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
+            RS.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
         end)
     end
 end)
 
--- ============================================
--- Character Event Handlers
--- ============================================
-local function OnCharacterAdded(character)
-    character:WaitForChild("HumanoidRootPart")
+player.CharacterAdded:Connect(function()
     task.wait(1 + math.random())
-    
-    print("[DinoHub] Character loaded, applying effects...")
-    
-    ApplyCharacterAura(character)
-    CreateRainbowLabel(character)
-    UpdateNoclip()
-    UpdateNoGravity()
-    
-    if Config.InvisibleEnabled then
-        SetInvisible(true)
+    if noclip then SetNoclip(true) end
+    CollectLoop()
+end)
+CollectLoop()
+
+-- Server hopping
+repeat task.wait(2) until game:IsLoaded()
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlaceId = game.PlaceId
+local servers = {}
+local cursor = ""
+local hour = os.date("!*t").hour
+local success, err = pcall(function()
+    servers = HttpService:JSONDecode(readfile("NotSameServers.json"))
+end)
+if not success then
+    table.insert(servers, hour)
+    writefile("NotSameServers.json", HttpService:JSONEncode(servers))
+end
+
+local function ShowHopUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "HNC_Hub_HopUI"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.Parent = CoreGui
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    frame.BorderSizePixel = 0
+    frame.BackgroundTransparency = 0
+    frame.Parent = gui
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0.2, 0)
+    title.Position = UDim2.new(0, 0, 0.35, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "DinoHUB - Auto Collect Chest"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.SourceSansBold
+    title.TextScaled = true
+    title.Parent = frame
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0.2, 0)
+    status.Position = UDim2.new(0, 0, 0.5, 0)
+    status.BackgroundTransparency = 1
+    status.Text = "Hopping to new server..."
+    status.TextColor3 = Color3.fromRGB(255, 170, 0)
+    status.Font = Enum.Font.SourceSansBold
+    status.TextScaled = true
+    status.Parent = frame
+end
+
+function TPReturner()
+    local data
+    local url
+    if cursor == "" then
+        url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    else
+        url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&cursor=" .. cursor
     end
-    
-    ServerHopInitiated = false
-    NoChestWaitTime = 0
-    
-    if not CollectionActive then
-        task.wait(2)
-        StartChestCollection()
+    data = HttpService:JSONDecode(game:HttpGet(url))
+    if data.nextPageCursor and data.nextPageCursor ~= "null" then
+        cursor = data.nextPageCursor
+    end
+    local count = 0
+    for _, server in pairs(data.data) do
+        local id = tostring(server.id)
+        local valid = true
+        if tonumber(server.playing) < tonumber(server.maxPlayers) then
+            for _, s in pairs(servers) do
+                if count ~= 0 then
+                    if id == tostring(s) then
+                        valid = false
+                    end
+                else
+                    if tonumber(hour) ~= tonumber(s) then
+                        pcall(function()
+                            delfile("NotSameServers.json")
+                            servers = {}
+                            table.insert(servers, hour)
+                        end)
+                    end
+                end
+                count = count + 1
+            end
+            if valid then
+                table.insert(servers, id)
+                pcall(function()
+                    writefile("NotSameServers.json", HttpService:JSONEncode(servers))
+                    ShowHopUI()
+                    task.wait(3 + math.random(2))
+                    TeleportService:TeleportToPlaceInstance(PlaceId, id, LocalPlayer)
+                end)
+                task.wait(4)
+            end
+        end
     end
 end
 
-if LocalPlayer.Character then
-    OnCharacterAdded(LocalPlayer.Character)
-else
-    LocalPlayer.CharacterAdded:Wait()
-    task.wait(0.5)
-    OnCharacterAdded(LocalPlayer.Character)
+function TeleportLoop()
+    while task.wait(1 + math.random()) do
+        pcall(function()
+            TPReturner()
+            if cursor ~= "" then
+                TPReturner()
+            end
+        end)
+    end
 end
 
-LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
-
--- ============================================
--- Initialization
--- ============================================
-print("[DinoHub] Loading Auto Collect Chest V2.2...")
-CreateLoadingUI()
-task.wait(1)
-InitializeChestCache()
-task.wait(2)
-CreateControlPanel()
-if LocalPlayer.Character then
-    OnCharacterAdded(LocalPlayer.Character)
-else
-    LocalPlayer.CharacterAdded:Wait()
-    OnCharacterAdded(LocalPlayer.Character)
+-- Mini UI
+if CoreGui:FindFirstChild("HN_MiniUI") then
+    CoreGui.HN_MiniUI:Destroy()
 end
-LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
-task.wait(1)
-print("[DinoHub] Auto Collect Chest V2.2 Loaded!")
-print("[DinoHub] Total Chests Found: " .. ChestStats.Total)
-print("[DinoHub] Smart Collection: Active")
-print("[DinoHub] Server Hop Settings:")
-print("  - Max Capacity: " .. (Config.MaxServerCapacity * 100) .. "%")
-print("  - Prefer Low Population: " .. tostring(Config.PreferLowPopulation))
-print("  - Player Range: " .. Config.MinPlayers .. "-" .. Config.MaxPlayers)
-print("[DinoHub] Waiting for chests to spawn...")
+local MiniGui = Instance.new("ScreenGui")
+MiniGui.Name = "HN_MiniUI"
+MiniGui.Parent = CoreGui
 
+local function CreateToggle(text, offset, default, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 140, 0, 18)
+    label.Position = UDim2.new(1, -160, 0.1, offset)
+    label.AnchorPoint = Vector2.new(0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Parent = MiniGui
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 25, 0, 25)
+    button.Position = UDim2.new(1, -80, 0.1, offset + 18)
+    button.AnchorPoint = Vector2.new(0, 0)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 16
+    button.Font = Enum.Font.GothamBold
+    button.Parent = MiniGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = button
+    local enabled = default
+    local function Update()
+        if enabled then
+            button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            button.Text = "✓"
+        else
+            button.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+            button.Text = ""
+        end
+    end
+    Update()
+    button.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        Update()
+        callback(enabled)
+    end)
+    return function() return enabled end, function(val) enabled = val Update() callback(val) end
+end
+
+local antiKick = true
+CreateToggle("Anti Kick", 0, true, function(val) antiKick = val end)
 task.spawn(function()
-    task.wait(5)
-    if ChestStats.Total == 0 then
-        print("[DinoHub] WARNING: No chests found after 5 seconds!")
-        print("[DinoHub] Rescanning workspace...")
-        CacheInitialized = false
-        InitializeChestCache()
+    while task.wait(30 + math.random(20)) do
+        if antiKick and player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.Health = 0
+        end
     end
+end)
+
+local invisible = false
+local function SetInvisible(enable)
+    if player.Character then
+        for _, desc in ipairs(player.Character:GetDescendants()) do
+            if desc:IsA("BasePart") or desc:IsA("Decal") then
+                desc.LocalTransparencyModifier = enable and 1 or 0
+            end
+        end
+    end
+end
+CreateToggle("Invisible", 60, false, function(val)
+    invisible = val
+    SetInvisible(invisible)
+end)
+player.CharacterAdded:Connect(function(char)
+    char:WaitForChild("HumanoidRootPart")
+    task.wait(0.2 + math.random() * 0.1)
+    if invisible then SetInvisible(true) end
+    if noclip then SetNoclip(true) end
+end)
+
+local function SetClearMap(enable)
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if desc:IsA("BasePart") or desc:IsA("Decal") then
+            if not desc:IsDescendantOf(player.Character) then
+                desc.LocalTransparencyModifier = enable and 1 or 0
+            end
+        end
+    end
+end
+CreateToggle("Clear Map", 120, false, SetClearMap)
+
+CreateToggle("Tween Mode", 180, true, function(val) useTween = val end)
+
+CreateToggle("Noclip", 240, false, function(val)
+    noclip = val
+    if noclip then SetNoclip(true) end
 end)
