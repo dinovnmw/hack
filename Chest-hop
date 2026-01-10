@@ -269,7 +269,7 @@ task.spawn(function()
 	while task.wait(5 + math.random(5)) do
 		pcall(function()
 			q.Remotes.CommF_:InvokeServer("SetTeam", "Marines");
-		end;
+		end)
 	end;
 end);
 z.CharacterAdded:Connect(function()
