@@ -265,9 +265,9 @@ local function StartFruitFinder()
                     end
                 end
                 
-                if not foundFruit and tick() - lastServerHop >= 5 then
-                    ui.updateStatus("Searching (Hop in 5s)...")
-                    if tick() - lastServerHop >= 15 then
+                if not foundFruit and tick() - lastServerHop >= 2 then
+                    ui.updateStatus("Searching (Hopping)...")
+                    if tick() - lastServerHop >= 5 then
                         ui.updateStatus("Server Hopping...")
                         task.wait(1)
                         local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
