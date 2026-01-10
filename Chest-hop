@@ -1,4 +1,17 @@
---// This file was created by XHider https://discord.com/invite/E2N7w35zkt
+
+local vim = game:GetService("VirtualInputManager")
+local camera = workspace.CurrentCamera
+local centerX = camera.ViewportSize.X / 2 + 10 -- a bit to the right
+local centerY = camera.ViewportSize.Y / 2
+task.spawn(function()
+    local start = tick()
+    while tick() - start < 2 do
+        vim:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+        wait(0.05)
+        vim:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+        wait(0.05)
+    end
+end)
 
 local q = game.Players.LocalPlayer;
 local U = game:GetService("UserInputService");
@@ -256,7 +269,7 @@ task.spawn(function()
 	while task.wait(5 + math.random(5)) do
 		pcall(function()
 			q.Remotes.CommF_:InvokeServer("SetTeam", "Marines");
-		end);
+		end;
 	end;
 end);
 z.CharacterAdded:Connect(function()
