@@ -2,6 +2,14 @@ local vim = game:GetService("VirtualInputManager")
 local camera = workspace.CurrentCamera
 local centerX = camera.ViewportSize.X / 2 + 10 
 local centerY = camera.ViewportSize.Y / 2
+local function JoinTeam()
+    pcall(function()
+        if plr.Team == nil then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
+        end
+    end)
+end
+JoinTeam()
 task.spawn(function()
     local start = tick()
     while tick() - start < 2 do
