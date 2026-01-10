@@ -1,171 +1,307 @@
 --====================================
--- DinoKEY | Ultra Premium UI
+-- DinoKEY | Ultra Premium UI (Remastered)
 --====================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait(0.5)
 
+-- SERVICES
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
-local CoreGui = game:GetService("CoreGui")
+local HttpService  = game:GetService("HttpService")
+local CoreGui      = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService   = game:GetService("RunService")
 
+-- PATH & CONFIG (LOGIC GIỮ NGUYÊN)
 local FOLDER = "DinoLoader"
 local CONFIG_FILE = FOLDER .. "/config.json"
+
 local SCRIPTS = {
     PVP   = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP",
     CHEST = "https://raw.githubusercontent.com/dinovnmw/hack/main/Chest-hop"
 }
 
--- FILESYSTEM LOGIC
 if not isfolder(FOLDER) then makefolder(FOLDER) end
-local Config = {AutoExecutor = true, AutoMode = "PVP"}
+
+local Config = {
+    AutoExecutor = true,
+    AutoMode = "PVP"
+}
+
 if isfile(CONFIG_FILE) then
     pcall(function() Config = HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
 else
     writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
 end
 
--- AUTOEXEC
-if Config.AutoExecutor and SCRIPTS[Config.AutoMode] then
-    pcall(function() loadstring(game:HttpGet(SCRIPTS[Config.AutoMode]))() end)
-    return
+local function Save()
+    writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
 end
 
 --====================================
--- UI CONSTRUCTION
+-- AUTOEXEC CONTROL
+--====================================
+local AUTOEXEC_DELAY = 5
+local IsAutoExecLoad = Config.AutoExecutor
+local AutoExecCancelled = false
+
+local function RunAutoExec()
+    if AutoExecCancelled then return end
+    if not Config.AutoExecutor then return end
+    local url = SCRIPTS[Config.AutoMode]
+    if url then
+        pcall(function() loadstring(game:HttpGet(url))() end)
+    end
+end
+
+--====================================
+-- PREMIUM UI CONSTRUCTION
 --====================================
 pcall(function() CoreGui:FindFirstChild("DinoLoaderUI"):Destroy() end)
 
 local Gui = Instance.new("ScreenGui", CoreGui)
 Gui.Name = "DinoLoaderUI"
 Gui.ResetOnSpawn = false
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main Frame
-local Main = Instance.new("Frame", Gui)
-Main.Size = UDim2.fromOffset(320, 260)
-Main.Position = UDim2.fromScale(0.5, 0.5)
-Main.AnchorPoint = Vector2.new(0.5, 0.5)
-Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-Main.BorderSizePixel = 0
-Main.ClipsDescendants = true
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 15)
-
--- Border Glow
-local MainStroke = Instance.new("UIStroke", Main)
-MainStroke.Color = Color3.fromRGB(45, 45, 45)
-MainStroke.Thickness = 2
-MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
--- Title DinoKEY (Centered)
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1, 0, 0, 50)
-Title.Position = UDim2.new(0, 0, 0, 5)
-Title.Text = "DinoKEY"
-Title.Font = Enum.Font.GothamBold
-Title.TextColor3 = Color3.fromRGB(0, 210, 255) -- Cyan Glow Color
-Title.TextSize = 22
-Title.BackgroundTransparency = 1
-Title.ZIndex = 2
-
--- Close Button (X)
-local CloseBtn = Instance.new("TextButton", Main)
-CloseBtn.Size = UDim2.fromOffset(30, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 10)
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-CloseBtn.TextSize = 18
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.ZIndex = 3
-
--- UI Helpers
-local function CreateButton(text, yPos, color)
-    local b = Instance.new("TextButton", Main)
-    b.Size = UDim2.new(1, -40, 0, 48)
-    b.Position = UDim2.new(0, 20, 0, yPos)
-    b.Text = text
-    b.Font = Enum.Font.GothamSemibold
-    b.TextColor3 = Color3.new(1, 1, 1)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    b.AutoButtonColor = false
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
-    
-    local s = Instance.new("UIStroke", b)
-    s.Thickness = 1.5
-    s.Color = Color3.fromRGB(50, 50, 50)
-
-    -- Animations
-    b.MouseEnter:Connect(function()
-        TweenService:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
-        TweenService:Create(s, TweenInfo.new(0.2), {Color = color}):Play()
+-- :: DRAG LOGIC ::
+local dragging, dragInput, dragStart, startPos
+local function MakeDraggable(frame)
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
     end)
-    b.MouseLeave:Connect(function()
-        TweenService:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}) :Play()
-        TweenService:Create(s, TweenInfo.new(0.2), {Color = Color3.fromRGB(50, 50, 50)}):Play()
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
     end)
-    b.MouseButton1Down:Connect(function()
-        b:TweenSize(UDim2.new(1, -50, 0, 44), "Out", "Quad", 0.1, true)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            TweenService:Create(frame, TweenInfo.new(0.15), {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}):Play()
+        end
     end)
-    b.MouseButton1Up:Connect(function()
-        b:TweenSize(UDim2.new(1, -40, 0, 48), "Out", "Quad", 0.1, true)
-    end)
-    
-    return b
 end
 
--- Buttons Creation
-local BtnPVP   = CreateButton("LOAD PVP MODE", 65, Color3.fromRGB(0, 150, 255))
-local BtnChest = CreateButton("LOAD AUTO CHEST", 125, Color3.fromRGB(255, 150, 0))
-local BtnAuto  = CreateButton("AUTO EXEC: " .. (Config.AutoExecutor and "ON" or "OFF"), 185, Color3.fromRGB(0, 255, 150))
+-- :: MAIN FRAME ::
+local Main = Instance.new("Frame", Gui)
+Main.Size = UDim2.fromOffset(0, 0) -- Start scale 0 for animation
+Main.Position = UDim2.fromScale(0.5, 0.5)
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+Main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+MakeDraggable(Main)
 
--- LOGIC
-local function Save() writefile(CONFIG_FILE, HttpService:JSONEncode(Config)) end
+-- Gradient Background
+local MainGrad = Instance.new("UIGradient", Main)
+MainGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 12))
+}
+MainGrad.Rotation = 45
+
+-- Glow Stroke
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Thickness = 1.5
+Stroke.Color = Color3.fromRGB(40, 40, 50)
+Stroke.Transparency = 0.2
+
+-- :: HEADER ::
+local Header = Instance.new("Frame", Main)
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundTransparency = 1
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Text = "Dino<font color=\"rgb(0,255,200)\">KEY</font>" -- Rich Text
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.RichText = true
+
+local CloseBtn = Instance.new("TextButton", Header)
+CloseBtn.Size = UDim2.fromOffset(24, 24)
+CloseBtn.Position = UDim2.new(1, -30, 0.5, 0)
+CloseBtn.AnchorPoint = Vector2.new(0, 0.5)
+CloseBtn.Text = "×"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+CloseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.BackgroundTransparency = 1
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+-- :: CONTENT ::
+local Container = Instance.new("Frame", Main)
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+
+local UIList = Instance.new("UIListLayout", Container)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 8)
+
+-- Progress Bar Container
+local ProgressFrame = Instance.new("Frame", Container)
+ProgressFrame.LayoutOrder = 0
+ProgressFrame.Size = UDim2.new(1, 0, 0, 24)
+ProgressFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Instance.new("UICorner", ProgressFrame).CornerRadius = UDim.new(0, 4)
+
+local ProgressBar = Instance.new("Frame", ProgressFrame)
+ProgressBar.Size = UDim2.new(0, 0, 1, 0) -- Starts at 0
+ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+ProgressBar.BorderSizePixel = 0
+Instance.new("UICorner", ProgressBar).CornerRadius = UDim.new(0, 4)
+
+local StatusText = Instance.new("TextLabel", ProgressFrame)
+StatusText.Size = UDim2.new(1, 0, 1, 0)
+StatusText.BackgroundTransparency = 1
+StatusText.Font = Enum.Font.GothamMedium
+StatusText.TextSize = 12
+StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusText.Text = "Waiting..."
+StatusText.ZIndex = 2
+
+-- :: BUTTON CREATOR WITH ANIMATION ::
+local function CreateButton(text, color, order)
+    local btn = Instance.new("TextButton", Container)
+    btn.LayoutOrder = order
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Text = ""
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    local btnStroke = Instance.new("UIStroke", btn)
+    btnStroke.Thickness = 1
+    btnStroke.Color = Color3.fromRGB(50, 50, 60)
+    btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    local lbl = Instance.new("TextLabel", btn)
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 14
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+
+    -- Hover Animation
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(35, 35, 45)}):Play()
+        TweenService:Create(btnStroke, TweenInfo.new(0.3), {Color = color}):Play()
+        TweenService:Create(lbl, TweenInfo.new(0.3), {TextColor3 = color}):Play()
+    end)
+
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(25, 25, 30)}):Play()
+        TweenService:Create(btnStroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(50, 50, 60)}):Play()
+        TweenService:Create(lbl, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
+    end)
+
+    btn.MouseButton1Down:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.new(1, -4, 0, 36)}):Play()
+    end)
+
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 0, 40)}):Play()
+    end)
+
+    return btn
+end
+
+local BtnPVP   = CreateButton("⚔ PVP MODE", Color3.fromRGB(0, 150, 255), 1)
+local BtnChest = CreateButton("📦 AUTO CHEST", Color3.fromRGB(255, 170, 0), 2)
+local BtnAuto  = CreateButton("⚙ AUTO EXEC: "..(Config.AutoExecutor and "ON" or "OFF"), Color3.fromRGB(0, 255, 150), 3)
+
+-- :: OPEN ANIMATION ::
+TweenService:Create(Main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(320, 240)}):Play()
+
+--====================================
+-- LOGIC HANDLERS
+--====================================
+local function CancelAuto()
+    AutoExecCancelled = true
+    TweenService:Create(ProgressBar, TweenInfo.new(0.3), {Size = UDim2.new(0,0,1,0), BackgroundColor3 = Color3.fromRGB(50,50,50)}):Play()
+    StatusText.Text = "Stopped"
+end
 
 BtnPVP.MouseButton1Click:Connect(function()
-    Config.AutoMode = "PVP"; Save()
+    CancelAuto()
+    Config.AutoMode = "PVP"
+    Save()
+    StatusText.Text = "Loading PVP..."
+    task.wait(0.2)
     loadstring(game:HttpGet(SCRIPTS.PVP))()
 end)
 
 BtnChest.MouseButton1Click:Connect(function()
-    Config.AutoMode = "CHEST"; Save()
+    CancelAuto()
+    Config.AutoMode = "CHEST"
+    Save()
+    StatusText.Text = "Loading Chest..."
+    task.wait(0.2)
     loadstring(game:HttpGet(SCRIPTS.CHEST))()
 end)
 
 BtnAuto.MouseButton1Click:Connect(function()
     Config.AutoExecutor = not Config.AutoExecutor
-    BtnAuto.Text = "AUTO EXEC: " .. (Config.AutoExecutor and "ON" or "OFF")
+    BtnAuto.FindFirstChildOfClass("TextLabel").Text = "⚙ AUTO EXEC: "..(Config.AutoExecutor and "ON" or "OFF")
     Save()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    TweenService:Create(MainStroke, TweenInfo.new(0.2), {Transparency = 1}):Play()
-    Main:TweenSize(UDim2.fromOffset(0, 0), "In", "Back", 0.3, true, function() Gui:Destroy() end)
+    CancelAuto()
+    TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.fromOffset(0,0)}):Play()
+    task.wait(0.3)
+    Gui:Destroy()
 end)
 
--- Draggable Script
-local UserInputService = game:GetService("UserInputService")
-local dragging, dragInput, dragStart, startPos
-Main.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true; dragStart = input.Position; startPos = Main.Position
-    end
-end)
-Main.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
+CloseBtn.MouseEnter:Connect(function() TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play() end)
+CloseBtn.MouseLeave:Connect(function() TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play() end)
 
--- Intro Animation
-Main.Position = UDim2.fromScale(0.5, 0.4)
-Main.BackgroundTransparency = 1
-TweenService:Create(Main, TweenInfo.new(0.5, Enum.EasingStyle.Back), {
-    Position = UDim2.fromScale(0.5, 0.5),
-    BackgroundTransparency = 0
-}):Play()
+--====================================
+-- AUTOEXEC LOOP & VISUALS
+--====================================
+if IsAutoExecLoad then
+    task.spawn(function()
+        for i = 0, AUTOEXEC_DELAY * 10 do -- Loop 50 times (0.1s each) for smooth progress
+            if AutoExecCancelled then
+                StatusText.Text = "AutoExec Cancelled"
+                return
+            end
+            
+            local percent = 1 - (i / (AUTOEXEC_DELAY * 10))
+            local timeLeft = math.ceil(AUTOEXEC_DELAY - (i/10))
+            
+            StatusText.Text = "AutoExec in " .. timeLeft .. "s"
+            
+            -- Smooth Progress Bar
+            TweenService:Create(ProgressBar, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {Size = UDim2.new(percent, 0, 1, 0)}):Play()
+            
+            task.wait(0.1)
+        end
+        
+        -- Execute
+        StatusText.Text = "Executing..."
+        TweenService:Create(Main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.fromOffset(0,0)}):Play()
+        task.wait(0.5)
+        Gui:Destroy()
+        RunAutoExec()
+    end)
+else
+    StatusText.Text = "AutoExec is OFF"
+    ProgressBar.Size = UDim2.new(0,0,1,0)
+end
