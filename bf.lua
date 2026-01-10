@@ -1,6 +1,3 @@
-
-
-
 local vu1 = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local v2 = vu1:CreateWindow({
     ["Title"] = "DinoHub",
@@ -2586,7 +2583,7 @@ vu243.BorderSizePixel = 0
 vu243.Position = UDim2.new(0.020833336999999993, 0, 0.10528908129999999, 0)
 vu243.Size = UDim2.new(0, 50, 0, 50)
 vu243.Draggable = true
-vu243.Image = "http://www.roblox.com/asset/?id=98977023494737"
+vu243.Image = "http://www.roblox.com/asset/?id=96193913807693"
 v244.Parent = vu243
 v244.CornerRadius = UDim.new(1, 10)
 vu245.Parent = vu243
@@ -5726,7 +5723,7 @@ if Sea3 then
             if v663 == nil then
                 break
             end
-            if v664:IsA("MeshPart") and v664.MeshId == "rbxassetid://6745037796" then
+            if v664:IsA("MeshPart") and v664.MeshId == "rbxassetid://96193913807693" then
                 return v664
             end
         end
