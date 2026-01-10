@@ -1,4 +1,3 @@
-
 --// This file was created by XHider https://discord.com/invite/E2N7w35zkt
 
 local q = game.Players.LocalPlayer;
@@ -381,6 +380,20 @@ end;
 local a = Instance.new("ScreenGui");
 a.Name = "HN_MiniUI";
 a.Parent = W;
+local configFile = "DinoHubConfig.json";
+local configs = {};
+local function loadConfig()
+	local success, data = pcall(function()
+		return T:JSONDecode(readfile(configFile));
+	end);
+	if success then
+		configs = data;
+	end;
+end;
+local function saveConfig()
+	writefile(configFile, T:JSONEncode(configs));
+end;
+loadConfig();
 local function D(q, U, f, i)
 	local B = Instance.new("TextLabel");
 	B.Size = UDim2.new(0, 140, 0, 18);
@@ -401,7 +414,7 @@ local function D(q, U, f, i)
 	l.Font = Enum.Font.GothamBold;
 	l.Parent = a;
 	(Instance.new("UICorner", l)).CornerRadius = UDim.new(1, 0);
-	local x = f;
+	local x = configs[q] or f;
 	local function C()
 		if x then
 			l.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
@@ -416,13 +429,17 @@ local function D(q, U, f, i)
 		x = not x;
 		C();
 		i(x);
+		configs[q] = x;
+		saveConfig();
 	end);
 	return function()
 		return x;
 	end, function(q)
 		x = q;
 		C();
-		i(x);
+		i(q);
+		configs[q] = q;
+		saveConfig();
 	end;
 end;
 local j = true;
