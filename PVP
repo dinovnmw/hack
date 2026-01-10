@@ -625,7 +625,7 @@ local function CustomUILogic()
 end
 -- [LAYER 4] UI IMPLEMENTATION
 local Window = Fluent:CreateWindow({
-    Title = "DinoPVP - SUPER UPGRADED",
+    Title = "DinoPVP",
     SubTitle = "DinoDev",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -642,8 +642,8 @@ local Tabs = {
     Legit = Window:AddTab({ Title = "Legit", Icon = "lock" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "box" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
-    PVPExtra = Window:AddTab({ Title = "PVP Extra", Icon = "swords" }),
-    SuperExtra = Window:AddTab({ Title = "Super Extra", Icon = "star" })
+    PVPExtra = Window:AddTab({ Title = "PVP Extra (Fun) ", Icon = "swords" }),
+    SuperExtra = Window:AddTab({ Title = "Super Extra(Fun) ", Icon = "star" })
 }
 -- [[ AIMBOT TAB ]]
 local AimbotSection = Tabs.Aimbot:AddSection("Aimbot Settings")
