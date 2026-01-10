@@ -463,10 +463,7 @@ local function D(q, U, f, i)
 		saveConfig();
 	end;
 end;
-local j = true;
-D("Anti Kick", 0, true, function(q)
-	j = q;
-end);
+
 
 -- [ĐÃ FIX] Bỏ chức năng Reset Player (Giữ nút nhưng xóa logic kill)
 task.spawn(function()
