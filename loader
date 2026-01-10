@@ -1,0 +1,171 @@
+--====================================
+-- DinoKEY | Ultra Premium UI
+--====================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+task.wait(0.5)
+
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+local FOLDER = "DinoLoader"
+local CONFIG_FILE = FOLDER .. "/config.json"
+local SCRIPTS = {
+    PVP   = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP",
+    CHEST = "https://raw.githubusercontent.com/dinovnmw/hack/main/Chest-hop"
+}
+
+-- FILESYSTEM LOGIC
+if not isfolder(FOLDER) then makefolder(FOLDER) end
+local Config = {AutoExecutor = true, AutoMode = "PVP"}
+if isfile(CONFIG_FILE) then
+    pcall(function() Config = HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
+else
+    writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
+end
+
+-- AUTOEXEC
+if Config.AutoExecutor and SCRIPTS[Config.AutoMode] then
+    pcall(function() loadstring(game:HttpGet(SCRIPTS[Config.AutoMode]))() end)
+    return
+end
+
+--====================================
+-- UI CONSTRUCTION
+--====================================
+pcall(function() CoreGui:FindFirstChild("DinoLoaderUI"):Destroy() end)
+
+local Gui = Instance.new("ScreenGui", CoreGui)
+Gui.Name = "DinoLoaderUI"
+Gui.ResetOnSpawn = false
+
+-- Main Frame
+local Main = Instance.new("Frame", Gui)
+Main.Size = UDim2.fromOffset(320, 260)
+Main.Position = UDim2.fromScale(0.5, 0.5)
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 15)
+
+-- Border Glow
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(45, 45, 45)
+MainStroke.Thickness = 2
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- Title DinoKEY (Centered)
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Position = UDim2.new(0, 0, 0, 5)
+Title.Text = "DinoKEY"
+Title.Font = Enum.Font.GothamBold
+Title.TextColor3 = Color3.fromRGB(0, 210, 255) -- Cyan Glow Color
+Title.TextSize = 22
+Title.BackgroundTransparency = 1
+Title.ZIndex = 2
+
+-- Close Button (X)
+local CloseBtn = Instance.new("TextButton", Main)
+CloseBtn.Size = UDim2.fromOffset(30, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 10)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.TextSize = 18
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.ZIndex = 3
+
+-- UI Helpers
+local function CreateButton(text, yPos, color)
+    local b = Instance.new("TextButton", Main)
+    b.Size = UDim2.new(1, -40, 0, 48)
+    b.Position = UDim2.new(0, 20, 0, yPos)
+    b.Text = text
+    b.Font = Enum.Font.GothamSemibold
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    b.AutoButtonColor = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+    
+    local s = Instance.new("UIStroke", b)
+    s.Thickness = 1.5
+    s.Color = Color3.fromRGB(50, 50, 50)
+
+    -- Animations
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+        TweenService:Create(s, TweenInfo.new(0.2), {Color = color}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}) :Play()
+        TweenService:Create(s, TweenInfo.new(0.2), {Color = Color3.fromRGB(50, 50, 50)}):Play()
+    end)
+    b.MouseButton1Down:Connect(function()
+        b:TweenSize(UDim2.new(1, -50, 0, 44), "Out", "Quad", 0.1, true)
+    end)
+    b.MouseButton1Up:Connect(function()
+        b:TweenSize(UDim2.new(1, -40, 0, 48), "Out", "Quad", 0.1, true)
+    end)
+    
+    return b
+end
+
+-- Buttons Creation
+local BtnPVP   = CreateButton("LOAD PVP MODE", 65, Color3.fromRGB(0, 150, 255))
+local BtnChest = CreateButton("LOAD AUTO CHEST", 125, Color3.fromRGB(255, 150, 0))
+local BtnAuto  = CreateButton("AUTO EXEC: " .. (Config.AutoExecutor and "ON" or "OFF"), 185, Color3.fromRGB(0, 255, 150))
+
+-- LOGIC
+local function Save() writefile(CONFIG_FILE, HttpService:JSONEncode(Config)) end
+
+BtnPVP.MouseButton1Click:Connect(function()
+    Config.AutoMode = "PVP"; Save()
+    loadstring(game:HttpGet(SCRIPTS.PVP))()
+end)
+
+BtnChest.MouseButton1Click:Connect(function()
+    Config.AutoMode = "CHEST"; Save()
+    loadstring(game:HttpGet(SCRIPTS.CHEST))()
+end)
+
+BtnAuto.MouseButton1Click:Connect(function()
+    Config.AutoExecutor = not Config.AutoExecutor
+    BtnAuto.Text = "AUTO EXEC: " .. (Config.AutoExecutor and "ON" or "OFF")
+    Save()
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    TweenService:Create(MainStroke, TweenInfo.new(0.2), {Transparency = 1}):Play()
+    Main:TweenSize(UDim2.fromOffset(0, 0), "In", "Back", 0.3, true, function() Gui:Destroy() end)
+end)
+
+-- Draggable Script
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+Main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Main.Position
+    end
+end)
+Main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- Intro Animation
+Main.Position = UDim2.fromScale(0.5, 0.4)
+Main.BackgroundTransparency = 1
+TweenService:Create(Main, TweenInfo.new(0.5, Enum.EasingStyle.Back), {
+    Position = UDim2.fromScale(0.5, 0.5),
+    BackgroundTransparency = 0
+}):Play()
