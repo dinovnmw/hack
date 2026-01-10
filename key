@@ -10,7 +10,7 @@ local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local API_URL = "https://dinokey.x10.mx/key.php?api=verify"
-local MAIN_URL = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP"
+local MAIN_URL = "https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/loader"
 local CACHE_FILE = "dino_key_cache.json"
 
 local expireTime = nil
