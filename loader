@@ -1,11 +1,11 @@
 --====================================
 -- DinoKEY | ULTRA PREMIUM V2 (ANIMATED)
--- LOGIC: PRESERVED | UI: HYPER-ANIMATED
+-- UPDATED: ADDED BLOX FRUITS MODE
 --====================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 local CoreGui = game:GetService("CoreGui")
-pcall(function() CoreGui:FindFirstChild("DinoLoaderUI"):Destroy() end)
+pcall(function() if CoreGui:FindFirstChild("DinoLoaderUI") then CoreGui.DinoLoaderUI:Destroy() end end)
 
 local TweenService = game:GetService("TweenService")
 local HttpService  = game:GetService("HttpService")
@@ -13,13 +13,15 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 --====================================
--- CONFIG & DATA (GIỮ NGUYÊN)
+-- CONFIG & DATA
 --====================================
 local FOLDER, CONFIG_FILE = "DinoLoader", "DinoLoader/config.json"
 local SCRIPTS = {
     PVP   = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP",
-    CHEST = "https://raw.githubusercontent.com/dinovnmw/hack/main/Chest-hop"
+    CHEST = "https://raw.githubusercontent.com/dinovnmw/hack/main/Chest-hop",
+    BF    = "https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/bf.lua" -- Link mới thêm
 }
+
 if not isfolder(FOLDER) then makefolder(FOLDER) end
 local Config = { AutoExecutor = true, AutoMode = "PVP" }
 if isfile(CONFIG_FILE) then
@@ -36,7 +38,7 @@ local Gui = Instance.new("ScreenGui", CoreGui)
 Gui.Name = "DinoLoaderUI"
 
 local Main = Instance.new("Frame", Gui)
-Main.Size = UDim2.fromOffset(340, 280)
+Main.Size = UDim2.fromOffset(340, 330) -- Tăng chiều cao để đủ chỗ cho nút mới
 Main.Position = UDim2.fromScale(0.5, 0.5)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
@@ -44,20 +46,17 @@ Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
 
--- Rainbow Stroke Animation
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Thickness = 2
-MainStroke.Color = Color3.fromRGB(0, 210, 255)
 task.spawn(function()
     local h = 0
     while task.wait() do
         h = h + 1/300
-        if h > 1 then h = 0 end
-        MainStroke.Color = Color3.fromHSV(h, 0.8, 1)
+        MainStroke.Color = Color3.fromHSV(h > 1 and 0 or h, 0.8, 1)
+        h = h > 1 and 0 or h
     end
 end)
 
--- Header & Title
 local Header = Instance.new("Frame", Main)
 Header.Size = UDim2.new(1, 0, 0, 50)
 Header.BackgroundTransparency = 1
@@ -73,7 +72,6 @@ Title.TextColor3 = Color3.fromRGB(0, 210, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BackgroundTransparency = 1
 
--- ProgressBar (Slick Design)
 local ProgressBack = Instance.new("Frame", Main)
 ProgressBack.Size = UDim2.new(1, 0, 0, 2)
 ProgressBack.Position = UDim2.new(0, 0, 0, 50)
@@ -85,15 +83,15 @@ ProgressBar.Size = UDim2.new(0, 0, 1, 0)
 ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 210, 255)
 ProgressBar.BorderSizePixel = 0
 
--- Container for Buttons
 local Container = Instance.new("Frame", Main)
 Container.Size = UDim2.new(1, -40, 1, -110)
-Container.Position = UDim2.new(0, 20, 0, 75)
+Container.Position = UDim2.new(0, 20, 0, 70)
 Container.BackgroundTransparency = 1
-Instance.new("UIListLayout", Container).Padding = UDim.new(0, 12)
+local Layout = Instance.new("UIListLayout", Container)
+Layout.Padding = UDim.new(0, 10)
 
 --====================================
--- ANIMATION UTILS
+-- HELPER FUNCTIONS
 --====================================
 local function RippleEffect(btn)
     btn.MouseButton1Click:Connect(function()
@@ -104,24 +102,19 @@ local function RippleEffect(btn)
         ripple.Position = UDim2.fromOffset(UserInputService:GetMouseLocation().X - btn.AbsolutePosition.X, UserInputService:GetMouseLocation().Y - btn.AbsolutePosition.Y - 36)
         ripple.AnchorPoint = Vector2.new(0.5, 0.5)
         Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
-        
-        TweenService:Create(ripple, TweenInfo.new(0.5), {
-            Size = UDim2.fromOffset(btn.AbsoluteSize.X * 1.5, btn.AbsoluteSize.X * 1.5),
-            BackgroundTransparency = 1
-        }):Play()
-        task.wait(0.5)
-        ripple:Destroy()
+        TweenService:Create(ripple, TweenInfo.new(0.5), {Size = UDim2.fromOffset(btn.AbsoluteSize.X * 1.5, btn.AbsoluteSize.X * 1.5), BackgroundTransparency = 1}):Play()
+        task.wait(0.5); ripple:Destroy()
     end)
 end
 
 local function AddButton(text, color, callback)
     local Btn = Instance.new("TextButton", Container)
-    Btn.Size = UDim2.new(1, 0, 0, 48)
+    Btn.Size = UDim2.new(1, 0, 0, 42)
     Btn.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     Btn.Text = ""
     Btn.AutoButtonColor = false
     Btn.ClipsDescendants = true
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
     
     local Stroke = Instance.new("UIStroke", Btn)
     Stroke.Color = Color3.fromRGB(40, 40, 45)
@@ -135,16 +128,15 @@ local function AddButton(text, color, callback)
     Label.TextColor3 = Color3.fromRGB(180, 180, 180)
     Label.TextSize = 14
 
-    -- Hover Animations
     Btn.MouseEnter:Connect(function()
-        TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(25, 25, 35)}):Play()
-        TweenService:Create(Stroke, TweenInfo.new(0.3), {Color = color}):Play()
-        TweenService:Create(Label, TweenInfo.new(0.3), {TextColor3 = Color3.new(1, 1, 1)}):Play()
+        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 35)}):Play()
+        TweenService:Create(Stroke, TweenInfo.new(0.2), {Color = color}):Play()
+        TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.new(1, 1, 1)}):Play()
     end)
     Btn.MouseLeave:Connect(function()
-        TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(20, 20, 25)}):Play()
-        TweenService:Create(Stroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(40, 40, 45)}):Play()
-        TweenService:Create(Label, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
+        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 25)}):Play()
+        TweenService:Create(Stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(40, 40, 45)}):Play()
+        TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
     end)
     
     RippleEffect(Btn)
@@ -153,27 +145,32 @@ local function AddButton(text, color, callback)
 end
 
 --====================================
--- CONTENT SETUP
+-- BUTTONS SETUP
 --====================================
 AddButton("PVP MODE", Color3.fromRGB(0, 150, 255), function()
     if ScriptLoaded then return end
-    ScriptLoaded = true; AutoExecCancelled = true
-    Config.AutoMode = "PVP"; Save()
+    ScriptLoaded = true; AutoExecCancelled = true; Config.AutoMode = "PVP"; Save()
     Main:TweenSize(UDim2.fromOffset(0, 0), "In", "Back", 0.3, true, function() Gui:Destroy() end)
     loadstring(game:HttpGet(SCRIPTS.PVP))()
 end)
 
 AddButton("AUTO CHEST", Color3.fromRGB(255, 150, 0), function()
     if ScriptLoaded then return end
-    ScriptLoaded = true; AutoExecCancelled = true
-    Config.AutoMode = "CHEST"; Save()
+    ScriptLoaded = true; AutoExecCancelled = true; Config.AutoMode = "CHEST"; Save()
     Main:TweenSize(UDim2.fromOffset(0, 0), "In", "Back", 0.3, true, function() Gui:Destroy() end)
     loadstring(game:HttpGet(SCRIPTS.CHEST))()
 end)
 
+-- NÚT BLOX FRUITS MỚI
+AddButton("BLOX FRUITS", Color3.fromRGB(255, 0, 255), function()
+    if ScriptLoaded then return end
+    ScriptLoaded = true; AutoExecCancelled = true; Config.AutoMode = "BF"; Save()
+    Main:TweenSize(UDim2.fromOffset(0, 0), "In", "Back", 0.3, true, function() Gui:Destroy() end)
+    loadstring(game:HttpGet(SCRIPTS.BF))()
+end)
+
 local AutoLabel = AddButton("AUTO EXEC: "..(Config.AutoExecutor and "ON" or "OFF"), Color3.fromRGB(0, 255, 150), function(self)
-    Config.AutoExecutor = not Config.AutoExecutor
-    Save()
+    Config.AutoExecutor = not Config.AutoExecutor; Save()
     self.Text = "AUTO EXEC: "..(Config.AutoExecutor and "ON" or "OFF")
     self.TextColor3 = Config.AutoExecutor and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 80, 80)
     if not Config.AutoExecutor then AutoExecCancelled = true end
@@ -182,18 +179,18 @@ AutoLabel.TextColor3 = Config.AutoExecutor and Color3.fromRGB(0, 255, 150) or Co
 
 local StatusText = Instance.new("TextLabel", Main)
 StatusText.Size = UDim2.new(1, 0, 0, 30)
-StatusText.Position = UDim2.new(0, 0, 1, -35)
+StatusText.Position = UDim2.new(0, 0, 1, -30)
 StatusText.BackgroundTransparency = 1
 StatusText.Font = Enum.Font.GothamMedium
-StatusText.TextSize = 12
+StatusText.TextSize = 11
 StatusText.TextColor3 = Color3.fromRGB(100, 100, 100)
 StatusText.Text = "Ready to load"
 
 --====================================
--- DRAGGABLE + INTRO
+-- DRAG & INTRO
 --====================================
 local function EnableDrag()
-    local dragging, dragInput, dragStart, startPos
+    local dragging, dragStart, startPos
     Header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true; dragStart = input.Position; startPos = Main.Position
@@ -205,15 +202,12 @@ local function EnableDrag()
             Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-    end)
+    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 end
 EnableDrag()
 
--- Intro Animation (Elastic Pop-up)
 Main.Size = UDim2.fromOffset(0, 0)
-TweenService:Create(Main, TweenInfo.new(0.6, Enum.EasingStyle.Elastic), {Size = UDim2.fromOffset(340, 280)}):Play()
+TweenService:Create(Main, TweenInfo.new(0.6, Enum.EasingStyle.Elastic), {Size = UDim2.fromOffset(340, 330)}):Play()
 
 --====================================
 -- AUTOEXEC LOGIC
@@ -234,8 +228,7 @@ if Config.AutoExecutor then
         if not ScriptLoaded then
             ScriptLoaded = true
             Main:TweenSize(UDim2.fromOffset(0,0), "In", "Back", 0.3)
-            task.wait(0.3)
-            Gui:Destroy()
+            task.wait(0.3); Gui:Destroy()
             pcall(function() loadstring(game:HttpGet(SCRIPTS[Config.AutoMode]))() end)
         end
     end)
