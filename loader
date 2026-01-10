@@ -1,6 +1,6 @@
 --====================================
 -- DinoKEY | ULTRA PREMIUM V2 (ANIMATED)
--- UPDATED: ADDED BLOX FRUITS MODE
+-- UPDATED: FRUIT FINDER MODE
 --====================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -19,7 +19,7 @@ local FOLDER, CONFIG_FILE = "DinoLoader", "DinoLoader/config.json"
 local SCRIPTS = {
     PVP   = "https://raw.githubusercontent.com/dinovnmw/hack/main/PVP",
     CHEST = "https://raw.githubusercontent.com/dinovnmw/hack/main/Chest-hop",
-    BF    = "https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/bf.lua" -- Link mới thêm
+    BF    = "https://raw.githubusercontent.com/dinovnmw/hack/refs/heads/main/fruitfinder" 
 }
 
 if not isfolder(FOLDER) then makefolder(FOLDER) end
@@ -38,7 +38,7 @@ local Gui = Instance.new("ScreenGui", CoreGui)
 Gui.Name = "DinoLoaderUI"
 
 local Main = Instance.new("Frame", Gui)
-Main.Size = UDim2.fromOffset(340, 330) -- Tăng chiều cao để đủ chỗ cho nút mới
+Main.Size = UDim2.fromOffset(340, 330)
 Main.Position = UDim2.fromScale(0.5, 0.5)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
@@ -161,8 +161,8 @@ AddButton("AUTO CHEST", Color3.fromRGB(255, 150, 0), function()
     loadstring(game:HttpGet(SCRIPTS.CHEST))()
 end)
 
--- NÚT BLOX FRUITS MỚI
-AddButton("BLOX FRUITS", Color3.fromRGB(255, 0, 255), function()
+-- ĐÃ SỬA: BLOX FRUITS -> FRUIT FINDER
+AddButton("FRUIT FINDER", Color3.fromRGB(255, 0, 255), function()
     if ScriptLoaded then return end
     ScriptLoaded = true; AutoExecCancelled = true; Config.AutoMode = "BF"; Save()
     Main:TweenSize(UDim2.fromOffset(0, 0), "In", "Back", 0.3, true, function() Gui:Destroy() end)
