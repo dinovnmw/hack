@@ -29,7 +29,7 @@ if isfile(CONFIG_FILE) then
 end
 local function Save() writefile(CONFIG_FILE, HttpService:JSONEncode(Config)) end
 
-local AUTOEXEC_DELAY, AutoExecCancelled, ScriptLoaded = 5, false, false
+local AUTOEXEC_DELAY, AutoExecCancelled, ScriptLoaded = 2, false, false
 
 --====================================
 -- UI CREATION
