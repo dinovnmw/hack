@@ -5,14 +5,13 @@ local userInput = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
 local tweenService = game:GetService("TweenService")
 
--- State management
 local states = {
     Mode = "None",
     God = false,
     Freecam = false,
     Possess = false,
     AntiScript = false,
-    UIHidden = false
+    GuiVisible = true
 }
 
 local config = {
@@ -20,7 +19,8 @@ local config = {
     freecamBoost = 6,
     deleteRadius = 25,
     gridSnap = 1,
-    teleportTweenTime = 0.2
+    teleportTweenTime = 0.2,
+    guiAnimSpeed = 0.25
 }
 
 local undoStack = {}
@@ -29,247 +29,230 @@ local highlight = nil
 local possessTarget = nil
 local vel = Vector3.zero
 
--- Create main GUI
+-- Tạo GUI với phong cách Liquid Glass
 local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.Name = "AdvancedAdminUI"
 gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main container with glass effect
+-- Background hiệu ứng blur
+local blurEffect = Instance.new("BlurEffect")
+blurEffect.Size = 0
+blurEffect.Parent = game.Lighting
+
+-- Tạo frame chính với hiệu ứng thủy tinh
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 620, 0, 650)
-main.Position = UDim2.new(0, 30, 0.5, -325)
-main.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-main.BackgroundTransparency = 0.1
+main.Size = UDim2.new(0, 400, 0, 500)
+main.Position = UDim2.new(0, 40, 0.5, -250)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+main.BackgroundTransparency = 0.15
 main.BorderSizePixel = 0
 main.Active = true
 main.Draggable = true
+main.ClipsDescendants = true
 
--- Glass effect
-local glass = Instance.new("Frame", main)
-glass.Size = UDim2.new(1, 0, 1, 0)
-glass.BackgroundTransparency = 0.95
-glass.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-glass.BorderSizePixel = 0
-Instance.new("UICorner", glass).CornerRadius = UDim.new(0, 14)
+-- Hiệu ứng viền neon
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(100, 180, 255)
+stroke.Thickness = 2
+stroke.Transparency = 0.3
 
--- Neon border
-local border = Instance.new("UIStroke", main)
-border.Color = Color3.fromRGB(0, 255, 255)
-border.Thickness = 3
-border.Transparency = 0.3
+-- Hiệu ứng gradient
+local gradient = Instance.new("UIGradient", main)
+gradient.Rotation = 90
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 80, 150)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 40, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 20, 40))
+})
+gradient.Transparency = NumberSequence.new(0.7)
 
--- Inner glow
-local innerGlow = Instance.new("Frame", main)
-innerGlow.Size = UDim2.new(1, -6, 1, -6)
-innerGlow.Position = UDim2.new(0, 3, 0, 3)
-innerGlow.BackgroundTransparency = 1
-innerGlow.BorderSizePixel = 0
-local innerStroke = Instance.new("UIStroke", innerGlow)
-innerStroke.Color = Color3.fromRGB(0, 200, 255)
-innerStroke.Thickness = 1
-innerStroke.Transparency = 0.5
-Instance.new("UICorner", innerGlow).CornerRadius = UDim.new(0, 11)
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0, 20)
 
--- Corner rounding
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
+-- Header với hiệu ứng thủy tinh
+local header = Instance.new("Frame", main)
+header.Size = UDim2.new(1, 0, 0, 60)
+header.BackgroundTransparency = 0.9
+header.BorderSizePixel = 0
 
--- Title bar with neon effect
-local titleBar = Instance.new("Frame", main)
-titleBar.Size = UDim2.new(1, 0, 0, 50)
-titleBar.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
-titleBar.BackgroundTransparency = 0.2
-titleBar.BorderSizePixel = 0
-Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 14)
+local headerCorner = Instance.new("UICorner", header)
+headerCorner.CornerRadius = UDim.new(0, 20)
 
-local titleBarStroke = Instance.new("UIStroke", titleBar)
-titleBarStroke.Color = Color3.fromRGB(0, 255, 255)
-titleBarStroke.Thickness = 2
-titleBarStroke.Transparency = 0.3
+local headerGradient = Instance.new("UIGradient", header)
+headerGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 100, 180))
+})
+headerGradient.Transparency = NumberSequence.new(0.8)
 
-local title = Instance.new("TextLabel", titleBar)
-title.Size = UDim2.new(0.7, 0, 1, 0)
-title.Position = UDim2.new(0.05, 0, 0, 0)
-title.Text = "⚡ DINOTROLL v2.0 ⚡"
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 18
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -40, 1, 0)
+title.Position = UDim2.new(0, 20, 0, 0)
+title.Text = "DINO CONTROLS"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.BackgroundTransparency = 1
-title.TextStrokeTransparency = 0.8
-title.TextStrokeColor3 = Color3.fromRGB(0, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Hide/Show button (TOP RIGHT)
-local hideButton = Instance.new("TextButton", titleBar)
-hideButton.Size = UDim2.new(0, 30, 0, 30)
-hideButton.Position = UDim2.new(1, -40, 0.5, -15)
-hideButton.Text = "−"
-hideButton.Font = Enum.Font.GothamBlack
-hideButton.TextSize = 20
-hideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-hideButton.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
-hideButton.BackgroundTransparency = 0.2
-hideButton.BorderSizePixel = 0
-Instance.new("UICorner", hideButton).CornerRadius = UDim.new(1, 0)
+local titleGlow = Instance.new("TextLabel", header)
+titleGlow.Size = title.Size
+titleGlow.Position = title.Position
+titleGlow.Text = title.Text
+titleGlow.Font = title.Font
+titleGlow.TextSize = title.TextSize
+titleGlow.TextColor3 = Color3.fromRGB(100, 180, 255)
+titleGlow.BackgroundTransparency = 1
+titleGlow.TextXAlignment = Enum.TextXAlignment.Left
+titleGlow.ZIndex = -1
+titleGlow.TextTransparency = 0.7
 
-local hideButtonStroke = Instance.new("UIStroke", hideButton)
-hideButtonStroke.Color = Color3.fromRGB(0, 255, 255)
-hideButtonStroke.Thickness = 2
+-- Nút ẩn/hiện GUI
+local toggleButton = Instance.new("TextButton", gui)
+toggleButton.Size = UDim2.new(0, 40, 0, 40)
+toggleButton.Position = UDim2.new(1, -50, 0, 10)
+toggleButton.Text = "◀"
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 18
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.BackgroundColor3 = Color3.fromRGB(20, 40, 80)
+toggleButton.BackgroundTransparency = 0.3
+toggleButton.AutoButtonColor = true
 
--- Minimize/Expand button (BOTTOM CENTER - NEW)
-local minimizeButton = Instance.new("TextButton", gui)
-minimizeButton.Size = UDim2.new(0, 40, 0, 40)
-minimizeButton.Position = UDim2.new(0.5, -20, 1, -50)
-minimizeButton.Text = "▲"
-minimizeButton.Font = Enum.Font.GothamBlack
-minimizeButton.TextSize = 24
-minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
-minimizeButton.BackgroundTransparency = 0.2
-minimizeButton.BorderSizePixel = 0
-minimizeButton.Visible = false
-Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
+local toggleCorner = Instance.new("UICorner", toggleButton)
+toggleCorner.CornerRadius = UDim.new(0, 20)
 
-local minimizeStroke = Instance.new("UIStroke", minimizeButton)
-minimizeStroke.Color = Color3.fromRGB(0, 255, 255)
-minimizeStroke.Thickness = 3
+local toggleStroke = Instance.new("UIStroke", toggleButton)
+toggleStroke.Color = Color3.fromRGB(100, 180, 255)
+toggleStroke.Thickness = 2
+toggleStroke.Transparency = 0.3
 
--- Status display
-local status = Instance.new("TextLabel", main)
-status.Position = UDim2.new(0.05, 0, 0.09, 10)
-status.Size = UDim2.new(0.9, 0, 0, 35)
-status.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
-status.BackgroundTransparency = 0.3
+local toggleGradient = Instance.new("UIGradient", toggleButton)
+toggleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 100, 180)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 60, 120))
+})
+
+-- Status bar
+local statusContainer = Instance.new("Frame", main)
+statusContainer.Size = UDim2.new(1, -40, 0, 30)
+statusContainer.Position = UDim2.new(0, 20, 0, 70)
+statusContainer.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+statusContainer.BackgroundTransparency = 0.6
+statusContainer.BorderSizePixel = 0
+
+local statusCorner = Instance.new("UICorner", statusContainer)
+statusCorner.CornerRadius = UDim.new(0, 8)
+
+local status = Instance.new("TextLabel", statusContainer)
+status.Size = UDim2.new(1, -20, 1, 0)
+status.Position = UDim2.new(0, 10, 0, 0)
+status.BackgroundTransparency = 1
 status.TextXAlignment = Enum.TextXAlignment.Left
-status.Font = Enum.Font.GothamSemibold
-status.TextSize = 13
-status.TextColor3 = Color3.fromRGB(200, 255, 255)
-status.Text = "⚡ Mode: None | Freecam: OFF | God: OFF"
-status.TextStrokeTransparency = 0.8
-status.TextStrokeColor3 = Color3.fromRGB(0, 150, 255)
-Instance.new("UICorner", status).CornerRadius = UDim.new(0, 8)
+status.Font = Enum.Font.Gotham
+status.TextSize = 12
+status.TextColor3 = Color3.fromRGB(200, 220, 255)
+status.Text = "| READY | Mode: None | God: OFF | Freecam: OFF"
 
-local statusStroke = Instance.new("UIStroke", status)
-statusStroke.Color = Color3.fromRGB(0, 200, 255)
-statusStroke.Thickness = 1
-statusStroke.Transparency = 0.5
+-- Container cho các nút
+local buttonsContainer = Instance.new("ScrollingFrame", main)
+buttonsContainer.Size = UDim2.new(1, -40, 1, -120)
+buttonsContainer.Position = UDim2.new(0, 20, 0, 110)
+buttonsContainer.BackgroundTransparency = 1
+buttonsContainer.BorderSizePixel = 0
+buttonsContainer.ScrollBarThickness = 4
+buttonsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- Content container (to hide/show)
-local contentContainer = Instance.new("Frame", main)
-contentContainer.Size = UDim2.new(1, 0, 1, -60)
-contentContainer.Position = UDim2.new(0, 0, 0, 60)
-contentContainer.BackgroundTransparency = 1
-contentContainer.Visible = true
+local buttonsList = Instance.new("UIListLayout", buttonsContainer)
+buttonsList.Padding = UDim.new(0, 10)
+buttonsList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Function to update status with neon effect
+-- Hàm cập nhật status
 local function updateStatus()
-    local modeColor = {
-        None = "⚪",
-        Delete = "🔴",
-        Move = "🔵", 
-        Teleport = "🟠"
-    }
-    
-    local modeIcon = modeColor[states.Mode] or "⚪"
-    
-    status.Text = string.format("%s Mode: %s | Freecam: %s | God: %s",
-        modeIcon,
-        states.Mode,
-        states.Freecam and "ON" or "OFF",
-        states.God and "ON" or "OFF"
-    )
+    status.Text = string.format("| Mode: %s | God: %s | Freecam: %s | Possess: %s |",
+        states.Mode, states.God and "ON" or "OFF", 
+        states.Freecam and "ON" or "OFF", states.Possess and "ON" or "OFF")
 end
 
--- Function to create neon buttons
-local function makeNeonButton(text, y, cb, color)
-    local buttonContainer = Instance.new("Frame", contentContainer)
-    buttonContainer.Size = UDim2.new(0.9, 0, 0, 40)
-    buttonContainer.Position = UDim2.new(0.05, 0, y, 0)
-    buttonContainer.BackgroundTransparency = 1
+-- Hàm tạo nút với hiệu ứng liquid glass
+local function createLiquidButton(text, color)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 42)
+    button.Text = text
+    button.Font = Enum.Font.GothamSemibold
+    button.TextSize = 14
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundColor3 = color
+    button.BackgroundTransparency = 0.4
+    button.AutoButtonColor = true
     
-    local b = Instance.new("TextButton", buttonContainer)
-    b.Size = UDim2.new(1, 0, 1, 0)
-    b.Text = text
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 14
-    b.TextColor3 = Color3.fromRGB(255, 255, 255)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
-    b.BackgroundTransparency = 0.2
-    b.AutoButtonColor = true
-    b.ClipsDescendants = true
+    local corner = Instance.new("UICorner", button)
+    corner.CornerRadius = UDim.new(0, 10)
     
-    -- Liquid glass effect
-    local liquidEffect = Instance.new("Frame", b)
-    liquidEffect.Size = UDim2.new(1, 0, 0.5, 0)
-    liquidEffect.Position = UDim2.new(0, 0, 0, 0)
-    liquidEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    liquidEffect.BackgroundTransparency = 0.9
-    liquidEffect.BorderSizePixel = 0
+    local stroke = Instance.new("UIStroke", button)
+    stroke.Color = color
+    stroke.Thickness = 2
+    stroke.Transparency = 0.5
     
-    -- Neon border
-    local buttonStroke = Instance.new("UIStroke", b)
-    buttonStroke.Color = color
-    buttonStroke.Thickness = 2
-    buttonStroke.Transparency = 0.3
+    local gradient = Instance.new("UIGradient", button)
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, color)
+    })
+    gradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.7),
+        NumberSequenceKeypoint.new(1, 0.3)
+    })
     
-    -- Rounded corners
-    local corner = Instance.new("UICorner", b)
-    corner.CornerRadius = UDim.new(0, 8)
-    
-    -- Hover effect
-    b.MouseEnter:Connect(function()
-        tweenService:Create(buttonStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
-        tweenService:Create(b, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
-    end)
-    
-    b.MouseLeave:Connect(function()
-        tweenService:Create(buttonStroke, TweenInfo.new(0.2), {Transparency = 0.3}):Play()
-        tweenService:Create(b, TweenInfo.new(0.2), {BackgroundTransparency = 0.2}):Play()
-    end)
-    
-    b.MouseButton1Click:Connect(function()
-        -- Click animation
-        tweenService:Create(b, TweenInfo.new(0.1), {Size = UDim2.new(0.95, 0, 0.95, 0)}):Play()
-        task.wait(0.1)
-        tweenService:Create(b, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-        
-        cb(b)
-    end)
-    
-    return b
+    return button
 end
 
--- Create neon buttons
-local buttons = {}
-buttons.delete = makeNeonButton("🗑️ MODE DELETE", 0.12, function(b)
-    states.Mode = states.Mode == "Delete" and "None" or "Delete"
-    b.BackgroundColor3 = states.Mode == "Delete" and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(30, 30, 60)
-    updateStatus()
-end, Color3.fromRGB(255, 50, 50))
+-- Tạo các nút chức năng
+local modeButtons = {}
+local function createModeButton(text, y, modeName, color, keybind)
+    local button = createLiquidButton(text, color)
+    button.Parent = buttonsContainer
+    
+    button.MouseButton1Click:Connect(function()
+        states.Mode = states.Mode == modeName and "None" or modeName
+        button.BackgroundTransparency = states.Mode == modeName and 0.2 or 0.4
+        updateStatus()
+    end)
+    
+    modeButtons[modeName] = button
+    return button
+end
 
-buttons.move = makeNeonButton("↔️ MODE MOVE", 0.19, function(b)
-    states.Mode = states.Mode == "Move" and "None" or "Move"
-    b.BackgroundColor3 = states.Mode == "Move" and Color3.fromRGB(50, 120, 200) or Color3.fromRGB(30, 30, 60)
-    updateStatus()
-end, Color3.fromRGB(50, 150, 255))
+-- Các nút mode
+createModeButton("🗑️ DELETE MODE (X)", 0, "Delete", Color3.fromRGB(220, 60, 60), Enum.KeyCode.X)
+createModeButton("🚀 MOVE MODE (C)", 0, "Move", Color3.fromRGB(60, 140, 220), Enum.KeyCode.C)
+createModeButton("✨ TELEPORT MODE (T)", 0, "Teleport", Color3.fromRGB(220, 140, 60), Enum.KeyCode.T)
 
-buttons.teleport = makeNeonButton("📍 MODE TELEPORT", 0.26, function(b)
-    states.Mode = states.Mode == "Teleport" and "None" or "Teleport"
-    b.BackgroundColor3 = states.Mode == "Teleport" and Color3.fromRGB(200, 120, 50) or Color3.fromRGB(30, 30, 60)
-    updateStatus()
-end, Color3.fromRGB(255, 150, 50))
+-- Các nút chức năng khác
+local function createFunctionButton(text, color, callback)
+    local button = createLiquidButton(text, color)
+    button.Parent = buttonsContainer
+    
+    button.MouseButton1Click:Connect(function()
+        if callback then
+            callback(button)
+        end
+    end)
+    
+    return button
+end
 
-buttons.god = makeNeonButton("🛡️ GOD MODE", 0.33, function(b)
+local godButton = createFunctionButton("🛡️ GOD MODE (G)", Color3.fromRGB(60, 180, 60), function(b)
     states.God = not states.God
-    b.Text = states.God and "🛡️ GOD MODE ON" or "🛡️ GOD MODE OFF"
-    b.BackgroundColor3 = states.God and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(30, 30, 60)
+    b.Text = states.God and "🛡️ GOD MODE ON (G)" or "🛡️ GOD MODE OFF (G)"
     updateStatus()
-end, Color3.fromRGB(50, 255, 50))
+end)
 
-buttons.freecam = makeNeonButton("🎥 FREECAM", 0.40, function(b)
+local freecamButton = createFunctionButton("👁️ FREECAM (F)", Color3.fromRGB(180, 180, 60), function(b)
     states.Freecam = not states.Freecam
-    b.Text = states.Freecam and "🎥 FREECAM ON" or "🎥 FREECAM OFF"
-    b.BackgroundColor3 = states.Freecam and Color3.fromRGB(180, 180, 50) or Color3.fromRGB(30, 30, 60)
-
+    b.Text = states.Freecam and "👁️ FREECAM ON (F)" or "👁️ FREECAM OFF (F)"
+    
     if states.Freecam then
         camera.CameraType = Enum.CameraType.Scriptable
     else
@@ -278,139 +261,100 @@ buttons.freecam = makeNeonButton("🎥 FREECAM", 0.40, function(b)
             camera.CameraSubject = player.Character:FindFirstChild("Humanoid")
         end
     end
-
     updateStatus()
-end, Color3.fromRGB(255, 255, 50))
+end)
 
-buttons.possess = makeNeonButton("👤 POSSESS", 0.47, function(b)
+local possessButton = createFunctionButton("👤 POSSESS", Color3.fromRGB(140, 60, 200), function(b)
     states.Possess = not states.Possess
     b.Text = states.Possess and "👤 POSSESS ON" or "👤 POSSESS OFF"
-    b.BackgroundColor3 = states.Possess and Color3.fromRGB(150, 50, 200) or Color3.fromRGB(30, 30, 60)
-
+    
     if not states.Possess then
         possessTarget = nil
         if player.Character then
             camera.CameraSubject = player.Character:FindFirstChild("Humanoid")
         end
     end
-
     updateStatus()
-end, Color3.fromRGB(200, 50, 255))
+end)
 
-buttons.antiScript = makeNeonButton("🛡️ ANTI SCRIPT", 0.54, function(b)
+local antiScriptButton = createFunctionButton("🛡️ ANTI SCRIPT", Color3.fromRGB(60, 180, 120), function(b)
     states.AntiScript = not states.AntiScript
     b.Text = states.AntiScript and "🛡️ ANTI SCRIPT ON" or "🛡️ ANTI SCRIPT OFF"
-    b.BackgroundColor3 = states.AntiScript and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(30, 30, 60)
-end, Color3.fromRGB(50, 255, 50))
+end)
 
-buttons.deleteNearby = makeNeonButton("💥 DELETE NEARBY", 0.61, function(b)
+createFunctionButton("💥 DELETE NEARBY", Color3.fromRGB(220, 80, 80), function()
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-
     local root = player.Character.HumanoidRootPart
-    local count = 0
-
+    
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and not obj:IsDescendantOf(player.Character) then
             if (obj.Position - root.Position).Magnitude <= config.deleteRadius then
                 table.insert(undoStack, obj:Clone())
                 obj:Destroy()
-                count += 1
             end
         end
     end
-    
-    -- Flash effect
-    b.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-    task.wait(0.1)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
-end, Color3.fromRGB(255, 100, 100))
+end)
 
-buttons.undoDelete = makeNeonButton("↩️ UNDO DELETE", 0.68, function(b)
+createFunctionButton("↩️ UNDO DELETE", Color3.fromRGB(80, 160, 220), function()
     local last = table.remove(undoStack)
     if last then
         last.Parent = workspace
-        
-        -- Flash effect
-        b.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
-        task.wait(0.1)
-        b.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
     end
-end, Color3.fromRGB(100, 255, 100))
+end)
 
--- Highlight effect for selected parts
+-- Cập nhật kích thước canvas
+buttonsList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    buttonsContainer.CanvasSize = UDim2.new(0, 0, 0, buttonsList.AbsoluteContentSize.Y)
+end)
+
+-- Hàm ẩn/hiện GUI với animation
+local function toggleGuiVisibility()
+    states.GuiVisible = not states.GuiVisible
+    
+    if states.GuiVisible then
+        toggleButton.Text = "◀"
+        -- Hiện GUI với animation
+        main:TweenSize(UDim2.new(0, 400, 0, 500), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, config.guiAnimSpeed, true)
+        main:TweenPosition(UDim2.new(0, 40, 0.5, -250), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, config.guiAnimSpeed, true)
+        -- Tăng blur effect
+        tweenService:Create(blurEffect, TweenInfo.new(config.guiAnimSpeed), {Size = 12}):Play()
+    else
+        toggleButton.Text = "▶"
+        -- Ẩn GUI với animation
+        main:TweenSize(UDim2.new(0, 0, 0, 500), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, config.guiAnimSpeed, true)
+        main:TweenPosition(UDim2.new(0, -400, 0.5, -250), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, config.guiAnimSpeed, true)
+        -- Giảm blur effect
+        tweenService:Create(blurEffect, TweenInfo.new(config.guiAnimSpeed), {Size = 0}):Play()
+    end
+end
+
+-- Kết nối nút toggle
+toggleButton.MouseButton1Click:Connect(toggleGuiVisibility)
+
+-- Các hàm và chức năng còn lại giữ nguyên...
 local function getHighlight()
     if not highlight then
         highlight = Instance.new("Highlight")
-        highlight.FillTransparency = 0.8
-        highlight.FillColor = Color3.fromRGB(0, 100, 255)
-        highlight.OutlineColor = Color3.fromRGB(0, 255, 255)
+        highlight.FillTransparency = 1
+        highlight.OutlineColor = Color3.fromRGB(100, 180, 255)
         highlight.OutlineTransparency = 0
     end
     return highlight
 end
 
--- Teleport function with neon trail effect
 local function teleportTo(position)
     local char = player.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
     local root = char.HumanoidRootPart
-    
-    -- Create trail effect
-    local trail = Instance.new("Part")
-    trail.Size = Vector3.new(0.5, 0.5, 0.5)
-    trail.Position = root.Position
-    trail.Anchored = true
-    trail.CanCollide = false
-    trail.Material = EnumMaterial.Neon
-    trail.BrickColor = BrickColor.new("Cyan")
-    trail.Parent = workspace
-    
     local goal = {CFrame = CFrame.new(position + Vector3.new(0, 3, 0))}
+
     local tween = tweenService:Create(root, TweenInfo.new(config.teleportTweenTime, Enum.EasingStyle.Quad), goal)
     tween:Play()
-    
-    -- Clean up trail
-    game:GetService("Debris"):AddItem(trail, 1)
 end
 
--- UI Toggle function
-local function toggleUI()
-    states.UIHidden = not states.UIHidden
-    
-    if states.UIHidden then
-        -- Hide UI
-        contentContainer.Visible = false
-        status.Visible = false
-        main.Size = UDim2.new(0, 300, 0, 50)  -- Minimize to title bar only
-        hideButton.Text = "+"
-        minimizeButton.Visible = true
-        
-        -- Animate
-        tweenService:Create(main, TweenInfo.new(0.3), {Size = UDim2.new(0, 300, 0, 50)}):Play()
-    else
-        -- Show UI
-        contentContainer.Visible = true
-        status.Visible = true
-        main.Size = UDim2.new(0, 620, 0, 650)
-        hideButton.Text = "−"
-        minimizeButton.Visible = false
-        
-        -- Animate
-        tweenService:Create(main, TweenInfo.new(0.3), {Size = UDim2.new(0, 620, 0, 650)}):Play()
-    end
-end
-
--- Connect hide/show buttons
-hideButton.MouseButton1Click:Connect(toggleUI)
-minimizeButton.MouseButton1Click:Connect(toggleUI)
-
--- Main update loop with visual effects
 runService.RenderStepped:Connect(function(dt)
-    -- Pulsing neon effect for border
-    local pulse = math.sin(tick() * 3) * 0.2 + 0.8
-    border.Transparency = 0.5 - (pulse * 0.2)
-    
     if states.Freecam then
         local move = Vector3.zero
         local cf = camera.CFrame
@@ -439,15 +383,6 @@ runService.RenderStepped:Connect(function(dt)
         local hum = player.Character.Humanoid
         hum.Health = hum.MaxHealth
         hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-        
-        -- Visual god mode effect
-        if not states.UIHidden then
-            status.TextColor3 = Color3.fromRGB(100, 255, 100)
-        end
-    else
-        if not states.UIHidden then
-            status.TextColor3 = Color3.fromRGB(200, 255, 255)
-        end
     end
 
     if draggingPart and states.Mode == "Move" then
@@ -465,7 +400,6 @@ runService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Mouse interactions
 mouse.Button1Down:Connect(function()
     local t = mouse.Target
     if not t then return end
@@ -500,7 +434,6 @@ mouse.Button1Up:Connect(function()
     draggingPart = nil
 end)
 
--- Keyboard shortcuts
 userInput.InputBegan:Connect(function(i, gp)
     if gp then return end
 
@@ -512,35 +445,36 @@ userInput.InputBegan:Connect(function(i, gp)
         updateStatus()
     elseif i.KeyCode == Enum.KeyCode.X then
         states.Mode = states.Mode == "Delete" and "None" or "Delete"
+        if modeButtons["Delete"] then
+            modeButtons["Delete"].BackgroundTransparency = states.Mode == "Delete" and 0.2 or 0.4
+        end
         updateStatus()
     elseif i.KeyCode == Enum.KeyCode.C then
         states.Mode = states.Mode == "Move" and "None" or "Move"
+        if modeButtons["Move"] then
+            modeButtons["Move"].BackgroundTransparency = states.Mode == "Move" and 0.2 or 0.4
+        end
         updateStatus()
     elseif i.KeyCode == Enum.KeyCode.T then
         states.Mode = states.Mode == "Teleport" and "None" or "Teleport"
+        if modeButtons["Teleport"] then
+            modeButtons["Teleport"].BackgroundTransparency = states.Mode == "Teleport" and 0.2 or 0.4
+        end
         updateStatus()
     elseif i.KeyCode == Enum.KeyCode.H then
-        toggleUI()  -- Added shortcut to hide/show UI
+        -- Phím H để toggle GUI
+        toggleGuiVisibility()
     end
 end)
 
--- Anti-script protection
 player.CharacterAdded:Connect(function(char)
     char.DescendantAdded:Connect(function(obj)
         if states.AntiScript and 
-           (obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") or 
-            obj:IsA("AlignPosition") or obj:IsA("AlignOrientation")) then
+           (obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") or obj:IsA("AlignPosition") or obj:IsA("AlignOrientation")) then
             obj:Destroy()
         end
     end)
 end)
 
--- Initial update
+-- Cập nhật trạng thái ban đầu
 updateStatus()
-
--- Make the UI look active with a slight glow animation
-while true do
-    local glow = math.sin(tick() * 2) * 0.1 + 0.2
-    titleBarStroke.Transparency = glow
-    task.wait(0.1)
-end
