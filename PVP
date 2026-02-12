@@ -1379,7 +1379,7 @@ ConfigSection:AddButton({
             Fluent:Notify({
                 Title = configData.name,
                 Content = configData.des,
-                Duration = 2
+                Duration = 9999999999
             })
         else
             Fluent:Notify({
