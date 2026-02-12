@@ -547,11 +547,8 @@ local function RageModeLogic()
     AntibanDelay()
 end
 local function SilentAimLogic()
-    	Fluent:Notify({
-    	Title = "DinoDEV",
-    	Content = "Đang cập nhật"",
-   	 	Duration = 8
-		})
+    -- Aim without moving camera
+    -- Hook raycasts or something
     AntibanDelay()
 end
 local function WallBangLogic()
@@ -586,11 +583,8 @@ local function SpeedHackLogic()
     AntibanDelay()
 end
 local function AntiDetectLogic()
-        Fluent:Notify({
-    	Title = "DinoDEV",
-    	Content = "Đang cập nhật"",
-   	 	Duration = 8
-		})
+    -- Extra antiban layers
+    -- Spoof user agent or something, but in Roblox limited
     AntibanDelay()
 end
 local function InfiniteMoneyLogic()
@@ -687,19 +681,13 @@ local function RangeExtenderLogic()
     AntibanDelay()
 end
 local function HitEffectLogic()
-    	Fluent:Notify({
-    	Title = "DinoDEV",
-    	Content = "Đang cập nhật"",
-   	 	Duration = 8
-		})
+    -- Custom hit effects
+    -- Assume particle emitter on hit
     AntibanDelay()
 end
 local function CustomUILogic()
-    	Fluent:Notify({
-    	Title = "DinoDEV",
-    	Content = "Đang cập nhật"",
-   	 	Duration = 8
-		})
+    -- Custom UI elements
+    -- Add extra buttons or something
     AntibanDelay()
 end
 -- [LAYER 4] UI IMPLEMENTATION
