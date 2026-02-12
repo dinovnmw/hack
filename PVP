@@ -1721,7 +1721,11 @@ Services.RunService.Heartbeat:Connect(function(delta)
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then velocityVector = velocityVector + Vector3.new(0, 1, 0) end
         if Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then velocityVector = velocityVector - Vector3.new(0, 1, 0) end
     
-        velocity.Velocity = velocityVector.Unit * Config.FlySpeed
+        if velocityVector.Magnitude > 0 then
+            velocity.Velocity = velocityVector.Unit * Config.FlySpeed
+        else
+            velocity.Velocity = Vector3.new()
+        end
         if Config.FlyMode == "Jetpack" then
             velocity.Velocity = velocity.Velocity + Vector3.new(0, 10, 0) -- Boost up
         elseif Config.FlyMode == "NoclipFly" then
