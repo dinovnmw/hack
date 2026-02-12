@@ -547,8 +547,11 @@ local function RageModeLogic()
     AntibanDelay()
 end
 local function SilentAimLogic()
-    -- Aim without moving camera
-    -- Hook raycasts or something
+    	Fluent:Notify({
+    	Title = "DinoDEV",
+    	Content = "Đang cập nhật"",
+   	 	Duration = 8
+		})
     AntibanDelay()
 end
 local function WallBangLogic()
@@ -583,8 +586,11 @@ local function SpeedHackLogic()
     AntibanDelay()
 end
 local function AntiDetectLogic()
-    -- Extra antiban layers
-    -- Spoof user agent or something, but in Roblox limited
+        Fluent:Notify({
+    	Title = "DinoDEV",
+    	Content = "Đang cập nhật"",
+   	 	Duration = 8
+		})
     AntibanDelay()
 end
 local function InfiniteMoneyLogic()
@@ -681,13 +687,19 @@ local function RangeExtenderLogic()
     AntibanDelay()
 end
 local function HitEffectLogic()
-    -- Custom hit effects
-    -- Assume particle emitter on hit
+    	Fluent:Notify({
+    	Title = "DinoDEV",
+    	Content = "Đang cập nhật"",
+   	 	Duration = 8
+		})
     AntibanDelay()
 end
 local function CustomUILogic()
-    -- Custom UI elements
-    -- Add extra buttons or something
+    	Fluent:Notify({
+    	Title = "DinoDEV",
+    	Content = "Đang cập nhật"",
+   	 	Duration = 8
+		})
     AntibanDelay()
 end
 -- [LAYER 4] UI IMPLEMENTATION
@@ -1895,7 +1907,7 @@ end)
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetFolder("DinoPVP_V4_Config")
+SaveManager:SetFolder("DinoPVP")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 Window:SelectTab(1)
 Fluent:Notify({
